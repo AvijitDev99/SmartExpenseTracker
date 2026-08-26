@@ -1,0 +1,3071 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Smart Expense — Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ===================== TOKENS ===================== */
+:root{
+  --bg:#F4F6F3;
+  --surface:#FFFFFF;
+  --surface-2:#F0F2EE;
+  --ink:#161A17;
+  --muted:#6E766F;
+  --faint:#A2A99E;
+  --line:#E7EBE4;
+
+  --primary:#0E6E52;
+  --primary-dark:#093F30;
+  --primary-mid:#12885F;
+  --primary-light:#E1F2E8;
+
+  --blue:#3E63E0;
+  --blue-light:#E7ECFC;
+  --purple:#8B6EF0;
+  --purple-light:#EFE9FD;
+
+  --green:#1FA463;
+  --amber:#DA8A15;
+  --amber-light:#FCEFD8;
+  --red:#D8484A;
+  --red-light:#FBE7E7;
+
+  --r-xl:26px;
+  --r-lg:20px;
+  --r-md:14px;
+  --r-sm:10px;
+  --r-pill:999px;
+
+  --shadow-sm: 0 1px 2px rgba(15,25,20,0.04), 0 1px 1px rgba(15,25,20,0.03);
+  --shadow-md: 0 8px 24px -8px rgba(10,40,30,0.18);
+  --shadow-lg: 0 20px 48px -12px rgba(10,40,30,0.28);
+
+  --ease: cubic-bezier(.22,.9,.32,1);
+  --spring: cubic-bezier(.34,1.56,.64,1);
+  transition: background .35s var(--ease), color .35s var(--ease);
+}
+
+#device[data-theme="dark"]{
+  --bg:#12140F;
+  --surface:#1B1F19;
+  --surface-2:#242920;
+  --ink:#F1F3EC;
+  --muted:#9AA396;
+  --faint:#7C8676;
+  --line:#2C3226;
+
+  --primary-light:#173629;
+  --blue-light:#1B2340;
+  --purple-light:#26203F;
+  --amber-light:#332508;
+  --red-light:#3A1E1F;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md: 0 8px 24px -8px rgba(0,0,0,0.55);
+  --shadow-lg: 0 20px 48px -12px rgba(0,0,0,0.65);
+}
+#device[data-theme="dark"] .balance-card{ box-shadow:0 12px 32px -10px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05) inset; }
+#device[data-theme="dark"] #bottomnav{ box-shadow:0 -10px 24px -6px rgba(0,0,0,0.5); }
+#device[data-theme="dark"] #fab{ box-shadow:0 10px 26px -6px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.08); }
+#device[data-theme="dark"] .card{ box-shadow:var(--shadow-sm), 0 0 0 1px rgba(255,255,255,0.03) inset; }
+
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+button{color:inherit; font-family:inherit;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+  background:#DDE3DA;
+  color:var(--ink);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:100vh;
+}
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important;}
+}
+.num{font-variant-numeric:tabular-nums; font-feature-settings:"tnum";}
+.disp{font-family:'Space Grotesk', 'Manrope', sans-serif;}
+button{font-family:inherit;}
+::selection{background:var(--primary-light);}
+
+/* ===================== DEVICE FRAME ===================== */
+#device{
+  position:relative;
+  width:412px;
+  max-width:100vw;
+  height:890px;
+  max-height:100vh;
+  background:var(--bg);
+  color:var(--ink);
+  overflow:hidden;
+  box-shadow:var(--shadow-lg);
+  border-radius:0;
+  transition:background .35s var(--ease), color .35s var(--ease);
+}
+@media (min-width:460px){
+  #device{ border-radius:40px; border:10px solid #0d0f0e; height:874px;}
+}
+
+#statusbar{
+  height:34px; display:flex; align-items:center; justify-content:space-between;
+  padding:0 22px; font-size:13px; font-weight:700; color:var(--ink); flex-shrink:0;
+  position:relative; z-index:40; background:transparent;
+}
+#statusbar .sb-icons{display:flex; align-items:center; gap:5px;}
+
+.viewport{position:relative; width:100%; height:calc(100% - 34px); overflow:hidden;}
+
+/* ===================== SCREENS ===================== */
+.screen{
+  position:absolute; top:0; right:0; bottom:0; left:0;
+  background:var(--bg);
+  display:flex; flex-direction:column;
+  opacity:0; visibility:hidden;
+  transform:translateX(24px);
+  transition:opacity .32s var(--ease), transform .32s var(--ease), visibility .32s;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+}
+.screen.active{opacity:1; visibility:visible; transform:translateX(0); z-index:5;}
+.screen::-webkit-scrollbar{display:none;}
+/* zoom variant: used for detail / origin-anchored transitions (simulated shared-element) */
+.screen.zoom-out{transform:scale(0.94); transform-origin:center;}
+.screen.zoom-out.active{transform:scale(1);}
+.screen.from-fab{transform-origin:50% 100%;}
+
+.screen-scroll{flex:1; overflow-y:auto; padding-bottom:110px;}
+.screen-scroll::-webkit-scrollbar{display:none;}
+
+/* top bars */
+.topbar{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 20px 6px; flex-shrink:0;
+}
+.topbar h1{font-size:22px; margin:0; font-weight:800; letter-spacing:-0.02em;}
+.icon-btn{
+  width:40px; height:40px; border-radius:var(--r-pill); border:none;
+  background:var(--surface); display:flex; align-items:center; justify-content:center;
+  box-shadow:var(--shadow-sm); cursor:pointer; flex-shrink:0; color:var(--ink);
+  transition:transform .15s var(--ease);
+}
+.icon-btn:active{transform:scale(0.9);}
+.back-row{display:flex; align-items:center; gap:12px; padding:14px 20px 4px;}
+.back-row h1{font-size:19px; font-weight:800;}
+
+/* ===================== SPLASH ===================== */
+#screen-splash{
+  align-items:center; justify-content:center;
+  background:linear-gradient(160deg, var(--primary-dark) 0%, var(--primary) 62%, var(--primary-mid) 100%);
+  overflow:hidden;
+}
+.splash-rings{position:absolute; top:0; right:0; bottom:0; left:0; display:flex; align-items:center; justify-content:center; pointer-events:none;}
+.splash-rings span{position:absolute; border-radius:50%; border:1.5px solid rgba(255,255,255,0.28); width:90px; height:90px; opacity:0; animation:ringPulse 2.6s ease-out infinite;}
+.splash-rings span:nth-child(2){animation-delay:.7s;}
+.splash-rings span:nth-child(3){animation-delay:1.4s;}
+@keyframes ringPulse{0%{width:90px; height:90px; opacity:.55;}100%{width:320px; height:320px; opacity:0;}}
+.splash-mark{
+  width:88px; height:88px; border-radius:26px; background:rgba(255,255,255,0.14);
+  display:flex; align-items:center; justify-content:center; margin-bottom:22px;
+  opacity:0; transform:scale(.6);
+  animation: markIn .8s var(--spring) .15s forwards;
+  border:1px solid rgba(255,255,255,0.22); position:relative; z-index:2;
+}
+.splash-mark svg{width:48px; height:48px;}
+.logo-rupee{stroke-dasharray:60; stroke-dashoffset:60; animation:drawLogo .9s var(--ease) .5s forwards;}
+.logo-arrow{stroke-dasharray:20; stroke-dashoffset:20; animation:drawLogo .5s var(--ease) 1s forwards;}
+@keyframes drawLogo{to{stroke-dashoffset:0;}}
+@keyframes markIn{to{opacity:1; transform:scale(1);}}
+.splash-title{color:#fff; font-size:28px; font-weight:800; letter-spacing:-0.02em; opacity:0; transform:translateY(8px); animation: upIn .7s var(--ease) .5s forwards; position:relative; z-index:2;}
+.splash-sub{color:rgba(255,255,255,0.72); font-size:14px; margin-top:8px; opacity:0; transform:translateY(8px); animation: upIn .7s var(--ease) .65s forwards; position:relative; z-index:2;}
+@keyframes upIn{to{opacity:1; transform:translateY(0);}}
+.splash-progress{position:absolute; bottom:56px; left:50%; transform:translateX(-50%); width:120px; height:3px; border-radius:99px; background:rgba(255,255,255,0.18); overflow:hidden; z-index:2;}
+.splash-progress div{height:100%; width:0%; background:#fff; border-radius:99px; animation:splashLoad 1.6s ease-in-out .5s forwards;}
+@keyframes splashLoad{to{width:100%;}}
+
+/* ===================== ONBOARDING ===================== */
+#screen-onboard{background:var(--bg);}
+.ob-topbar{display:flex; align-items:center; justify-content:space-between; padding:18px 20px 0;}
+.ob-brand{display:flex; align-items:center; gap:8px; font-size:13.5px; font-weight:800; color:var(--ink);}
+.ob-brand svg{width:24px; height:24px;}
+.ob-skip{background:none; border:none; color:var(--muted); font-weight:700; font-size:14px; padding:8px 4px; cursor:pointer;}
+.ob-track{flex:1; display:flex; width:400%; height:100%; transition:transform .5s var(--ease); touch-action:pan-y;}
+.ob-slide{width:25%; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:0 32px; text-align:center;}
+.ob-visual{width:230px; height:230px; border-radius:32px; display:flex; align-items:center; justify-content:center; margin-bottom:32px; position:relative; overflow:hidden;}
+.ob-blob{position:absolute; width:150%; height:150%; border-radius:50%; opacity:.5; animation:blobDrift 7s ease-in-out infinite;}
+@keyframes blobDrift{0%,100%{transform:translate(-4%,-4%) scale(1);}50%{transform:translate(4%,4%) scale(1.08);}}
+.ob-slide h2{font-size:23px; font-weight:800; margin:0 0 10px; letter-spacing:-0.02em; opacity:0; animation:upIn .6s var(--ease) .12s forwards;}
+.ob-slide p{font-size:14.5px; color:var(--muted); line-height:1.55; margin:0; max-width:280px; opacity:0; animation:upIn .6s var(--ease) .22s forwards;}
+.ob-bottom{padding:20px 24px 30px; display:flex; flex-direction:column; gap:18px;}
+.ob-progress{display:flex; justify-content:center; gap:8px;}
+.ob-seg{width:34px; height:5px; border-radius:99px; background:var(--line); overflow:hidden; position:relative;}
+.ob-seg::after{content:''; position:absolute; top:0; right:0; bottom:0; left:0; background:var(--primary); transform:scaleX(0); transform-origin:left; transition:transform .4s var(--ease);}
+.ob-seg.done::after{transform:scaleX(1);}
+.ob-seg.active::after{transform:scaleX(1); transition:transform .5s linear;}
+
+/* card mini animation for onboarding 1 */
+.mini-card{width:140px; padding:12px 14px; background:var(--surface); border-radius:16px; box-shadow:var(--shadow-md); display:flex; align-items:center; gap:10px; position:absolute; z-index:1;}
+.mini-card .mc-ico{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px; flex-shrink:0;}
+.mini-card .mc-txt{text-align:left;}
+.mini-card .mc-txt b{display:block; font-size:12.5px;}
+.mini-card .mc-txt span{font-size:11px; color:var(--muted);}
+.mc1{top:10px; left:0; animation: floatA 4s ease-in-out infinite;}
+.mc2{bottom:18px; right:-10px; animation: floatB 4.5s ease-in-out infinite .3s;}
+@keyframes floatA{0%,100%{transform:translateY(0) rotate(-3deg);}50%{transform:translateY(-8px) rotate(-1deg);}}
+@keyframes floatB{0%,100%{transform:translateY(0) rotate(3deg);}50%{transform:translateY(-10px) rotate(1deg);}}
+
+/* onboarding slide 2 — animated budget ring */
+.ob-ring{animation:ringFill 2.4s var(--ease) infinite alternate;}
+@keyframes ringFill{0%{stroke-dashoffset:364;}100%{stroke-dashoffset:110;}}
+
+/* onboarding slide 3 — growing savings bars */
+.ob-bars{display:flex; align-items:flex-end; gap:10px; height:130px;}
+.ob-bar{width:20px; border-radius:7px 7px 3px 3px; background:linear-gradient(180deg, var(--purple), #6E8CF2); height:var(--h); animation:barGrow 1.8s var(--ease) infinite alternate; transform-origin:bottom;}
+.ob-bar:nth-child(2){animation-delay:.15s;}
+.ob-bar:nth-child(3){animation-delay:.3s;}
+.ob-bar:nth-child(4){animation-delay:.45s;}
+@keyframes barGrow{0%{transform:scaleY(.65);}100%{transform:scaleY(1);}}
+.ob-goal-tag{position:absolute; top:6px; right:2px; background:var(--surface); box-shadow:var(--shadow-md); border-radius:99px; padding:7px 13px; font-size:12px; font-weight:800; animation:floatA 4s ease-in-out infinite;}
+
+/* onboarding slide 4 — quick add flow */
+.ob-flow{position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; gap:12px;}
+.of-step{
+  background:var(--surface); box-shadow:var(--shadow-md); border-radius:16px; padding:12px 22px;
+  font-family:'Space Grotesk'; font-weight:700; font-size:17px; color:var(--ink);
+  opacity:0; transform:translateY(10px) scale(.9); animation:flowStep 3.2s var(--ease) infinite;
+  display:flex; align-items:center; gap:6px;
+}
+.of-step .of-ico{color:var(--primary); font-weight:800;}
+.of-step1{animation-delay:0s;}
+.of-step2{animation-delay:.55s; font-family:'Manrope';}
+.of-step3{animation-delay:1.1s; font-family:'Manrope';}
+.of-check{
+  background:var(--primary); color:#fff; border-radius:99px; padding:9px 20px; font-weight:800; font-size:13.5px;
+  opacity:0; transform:scale(.7); animation:flowCheck 3.2s var(--ease) infinite; animation-delay:1.7s;
+}
+@keyframes flowStep{
+  0%{opacity:0; transform:translateY(10px) scale(.9);}
+  8%,55%{opacity:1; transform:translateY(0) scale(1);}
+  70%,100%{opacity:0; transform:translateY(-6px) scale(.95);}
+}
+@keyframes flowCheck{
+  0%,45%{opacity:0; transform:scale(.7);}
+  55%{opacity:1; transform:scale(1.08);}
+  65%,90%{opacity:1; transform:scale(1);}
+  100%{opacity:0; transform:scale(.9);}
+}
+
+/* ===================== SETUP ===================== */
+.form-wrap{padding:8px 22px 30px; display:flex; flex-direction:column; gap:18px; flex:1;}
+.field{display:flex; flex-direction:column; gap:7px;}
+.field label{font-size:12.5px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.03em;}
+.field input, .field select{
+  border:1.5px solid var(--line); background:var(--surface); border-radius:var(--r-md);
+  padding:14px 16px; font-size:15.5px; font-weight:600; color:var(--ink); font-family:inherit;
+  outline:none; transition:border-color .2s;
+}
+.field input:focus, .field select:focus{border-color:var(--primary);}
+.field input::placeholder{color:var(--faint); font-weight:500;}
+.chip-row{display:flex; gap:10px; flex-wrap:wrap;}
+.chip{
+  padding:10px 16px; border-radius:var(--r-pill); border:1.5px solid var(--line); background:var(--surface);
+  font-size:13.5px; font-weight:700; color:var(--ink); cursor:pointer; transition:all .15s;
+}
+.chip.selected{background:var(--primary); border-color:var(--primary); color:#fff;}
+
+/* ===================== BUTTONS ===================== */
+.btn{
+  border:none; border-radius:var(--r-md); padding:16px 20px; font-size:15.5px; font-weight:800;
+  cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; gap:8px;
+  transition:transform .15s var(--ease), box-shadow .15s var(--ease), opacity .15s;
+  font-family:inherit;
+}
+.btn:active{transform:scale(0.97);}
+.btn-primary{background:var(--primary); color:#fff; box-shadow:0 10px 20px -8px rgba(14,110,82,0.5);}
+.btn-primary:disabled{opacity:.45; box-shadow:none;}
+.btn-outline{background:var(--surface); color:var(--ink); border:1.5px solid var(--line);}
+.btn-ghost{background:none; color:var(--muted); font-weight:700;}
+.btn-sm{padding:10px 16px; font-size:13.5px; border-radius:var(--r-sm); width:auto;}
+.btn-danger{background:var(--red-light); color:var(--red);}
+
+/* ===================== BOTTOM NAV + FAB ===================== */
+#bottomnav{
+  position:absolute; left:0; right:0; bottom:0; height:78px; background:var(--surface);
+  display:flex; align-items:center; justify-content:space-around; z-index:30;
+  border-top:1px solid var(--line); padding-bottom:10px;
+  box-shadow:0 -4px 16px rgba(10,30,20,0.04);
+}
+.nav-item{
+  display:flex; flex-direction:column; align-items:center; gap:5px; background:none; border:none; cursor:pointer;
+  color:var(--faint); font-size:10.5px; font-weight:700; padding:6px 14px; width:74px;
+  transition:color .2s; position:relative;
+}
+.nav-item .nav-ico-wrap{width:34px; height:26px; display:flex; align-items:center; justify-content:center; border-radius:12px; transition:background .25s var(--ease), transform .3s var(--spring);}
+.nav-item svg{width:22px; height:22px; transition:transform .3s var(--spring);}
+.nav-item.active{color:var(--primary);}
+.nav-item.active .nav-ico-wrap{background:var(--primary-light); transform:translateY(-2px);}
+.nav-item.active svg{transform:scale(1.05);}
+#device[data-theme="dark"] .nav-item.active .nav-ico-wrap{background:transparent;}
+.nav-item.bump .nav-ico-wrap{animation:navBump .38s var(--spring);}
+@keyframes navBump{0%{transform:scale(1);}40%{transform:scale(0.8);}100%{transform:scale(1) translateY(-2px);}}
+.nav-spacer{width:74px;}
+#fab{
+  position:absolute; left:50%; bottom:44px; transform:translateX(-50%); z-index:31;
+  width:58px; height:58px; border-radius:50%; background:var(--primary); border:5px solid var(--bg);
+  display:flex; align-items:center; justify-content:center; box-shadow:0 10px 22px -6px rgba(14,110,82,0.55);
+  cursor:pointer; transition:transform .18s var(--ease);
+}
+#fab:active{transform:translateX(-50%) scale(0.9);}
+#fab svg{width:24px; height:24px;}
+
+/* ===================== TABS ===================== */
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+
+/* ===================== HOME ===================== */
+.home-header{padding:18px 20px 8px; display:flex; align-items:center; justify-content:space-between;}
+.greet h2{margin:0; font-size:19px; font-weight:800;}
+.greet span{font-size:12.5px; color:var(--muted); font-weight:600;}
+.notif-dot{position:absolute; top:8px; right:8px; width:8px; height:8px; border-radius:50%; background:var(--red); border:2px solid var(--surface);}
+
+.balance-card{
+  margin:12px 20px 0; border-radius:var(--r-xl); padding:24px 22px 20px;
+  background:linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 55%, var(--primary-mid) 100%);
+  color:#fff; position:relative; overflow:hidden; box-shadow:var(--shadow-md);
+}
+.balance-card::before{
+  content:'₹'; position:absolute; right:-18px; bottom:-40px; font-size:190px; opacity:.08; font-weight:800; font-family:'Space Grotesk';
+}
+.balance-label{font-size:12.5px; font-weight:700; opacity:.78; letter-spacing:.02em;}
+.balance-amt{font-family:'Space Grotesk'; font-size:36px; font-weight:700; margin:6px 0 18px; letter-spacing:-0.01em; position:relative; z-index:2;}
+.balance-split{display:flex; gap:10px; position:relative; z-index:2;}
+.bs-item{flex:1; background:rgba(255,255,255,0.14); border-radius:14px; padding:11px 13px; backdrop-filter:blur(4px);}
+.bs-item .bsl{font-size:11px; opacity:.8; font-weight:700; display:flex; align-items:center; gap:5px;}
+.bs-item .bsv{font-size:16px; font-weight:800; margin-top:3px; font-family:'Space Grotesk';}
+
+.section{padding:22px 20px 0;}
+.section-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;}
+.section-head h3{font-size:16.5px; font-weight:800; margin:0;}
+.link-btn{background:none; border:none; color:var(--primary); font-weight:700; font-size:13px; cursor:pointer; padding:4px;}
+
+.card{background:var(--surface); border-radius:var(--r-lg); box-shadow:var(--shadow-sm); border:1px solid var(--line);}
+
+.budget-card{padding:18px 20px;}
+.budget-card .bc-top{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:12px;}
+.budget-card .bc-top b{font-size:15px; font-weight:800;}
+.budget-card .bc-nums{font-size:13px; color:var(--muted); font-weight:700; margin-bottom:8px;}
+.budget-card .bc-nums span{color:var(--ink);}
+.progress{height:9px; border-radius:99px; background:var(--surface-2); overflow:hidden; margin-bottom:10px;}
+.progress > div{height:100%; border-radius:99px; background:var(--primary); transition:width .8s var(--ease);}
+.progress.warn > div{background:var(--amber);}
+.progress.over > div{background:var(--red);}
+.bc-remain{font-size:12.5px; color:var(--muted); font-weight:600;}
+
+.cat-scroll{display:flex; gap:12px; overflow-x:auto; padding:2px 20px 2px; margin:0 -20px; scrollbar-width:none;}
+.cat-scroll::-webkit-scrollbar{display:none;}
+.cat-card{flex-shrink:0; width:104px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-md); padding:14px 14px; box-shadow:var(--shadow-sm); cursor:pointer;}
+.cat-card .cc-ico{width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:16px; margin-bottom:10px;}
+.cat-card b{display:block; font-size:12.5px; font-weight:700;}
+.cat-card span{font-size:13px; font-weight:800; font-family:'Space Grotesk';}
+
+.txn-row{display:flex; align-items:center; gap:12px; padding:13px 20px; cursor:pointer; transition:background .15s;}
+.txn-row:active{background:var(--surface-2);}
+.txn-ico{width:42px; height:42px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;}
+.txn-mid{flex:1; min-width:0;}
+.txn-mid b{display:block; font-size:14.5px; font-weight:700;}
+.txn-mid span{font-size:12px; color:var(--muted); font-weight:600;}
+.txn-amt{font-size:14.5px; font-weight:800; font-family:'Space Grotesk'; flex-shrink:0;}
+.txn-amt.pos{color:var(--green);}
+.txn-amt.neg{color:var(--ink);}
+.txn-list-card{padding:4px 0;}
+.txn-list-card .txn-row + .txn-row{border-top:1px solid var(--line);}
+
+.insight-card{margin:0 20px; padding:18px 20px; border-radius:var(--r-lg); background:linear-gradient(120deg, var(--purple-light), var(--blue-light)); border:1px solid #e4e1fb;}
+.insight-card .ic-tag{font-size:12.5px; font-weight:800; color:var(--purple); margin-bottom:6px;}
+.insight-card p{margin:0 0 12px; font-size:14px; font-weight:600; line-height:1.5; color:var(--ink);}
+
+/* skeleton */
+.skel{background:linear-gradient(90deg, var(--surface-2) 25%, #e5e9e1 37%, var(--surface-2) 63%); background-size:400% 100%; animation:shimmer 1.4s ease infinite; border-radius:var(--r-md);}
+#device[data-theme="dark"] .skel{background:linear-gradient(90deg, var(--surface-2) 25%, #33392c 37%, var(--surface-2) 63%); background-size:400% 100%;}
+.skel-row{padding:10px 20px;}
+
+/* staggered entrance for list/grid items */
+.stagger-in{opacity:0; animation:staggerIn .42s var(--ease) forwards;}
+@keyframes staggerIn{from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);}}
+@keyframes shimmer{0%{background-position:100% 0;}100%{background-position:0 0;}}
+
+/* empty state */
+.empty-state{display:flex; flex-direction:column; align-items:center; text-align:center; padding:50px 30px 30px;}
+.empty-state .es-ico{width:72px; height:72px; border-radius:22px; background:var(--surface-2); display:flex; align-items:center; justify-content:center; margin-bottom:18px; font-size:30px;}
+.empty-state h4{margin:0 0 6px; font-size:16.5px; font-weight:800;}
+.empty-state p{margin:0 0 20px; font-size:13.5px; color:var(--muted); max-width:230px; line-height:1.5;}
+
+/* ===================== TRANSACTIONS ===================== */
+.search-bar{margin:6px 20px 0; display:flex; gap:10px;}
+.search-input{flex:1; display:flex; align-items:center; gap:9px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-md); padding:12px 14px;}
+.search-input input{border:none; outline:none; background:none; font-size:14px; font-family:inherit; flex:1; color:var(--ink); font-weight:600;}
+.search-input input::placeholder{color:var(--faint); font-weight:500;}
+.filter-btn{width:44px; height:44px; border-radius:var(--r-md); background:var(--surface); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; position:relative;}
+.filter-btn.on::after{content:''; position:absolute; top:8px; right:8px; width:7px; height:7px; border-radius:50%; background:var(--primary);}
+.date-group-label{padding:16px 20px 8px; font-size:12.5px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:.04em;}
+
+/* ===================== BOTTOM SHEETS ===================== */
+.overlay{position:absolute; top:0; right:0; bottom:0; left:0; background:rgba(10,20,15,0.44); z-index:50; opacity:0; visibility:hidden; transition:opacity .28s var(--ease), visibility .28s;}
+.overlay.show{opacity:1; visibility:visible;}
+.sheet{
+  position:absolute; left:0; right:0; bottom:0; background:var(--surface); z-index:51;
+  border-radius:26px 26px 0 0; max-height:88%; display:flex; flex-direction:column;
+  transform:translateY(100%); transition:transform .38s var(--ease); box-shadow:0 -10px 40px rgba(0,0,0,0.2);
+}
+.sheet.show{transform:translateY(0);}
+.sheet-drag{width:40px; height:5px; border-radius:99px; background:var(--line); margin:12px auto 4px;}
+.sheet-head{display:flex; align-items:center; justify-content:space-between; padding:10px 20px 4px;}
+.sheet-head h3{font-size:17px; font-weight:800; margin:0;}
+.sheet-body{padding:14px 20px 26px; overflow-y:auto;}
+.sheet-body::-webkit-scrollbar{display:none;}
+.sheet-foot{padding:12px 20px 24px; border-top:1px solid var(--line);}
+
+/* amount input */
+.amt-input-wrap{display:flex; align-items:center; justify-content:center; padding:26px 0 10px; gap:4px;}
+.amt-input-wrap .rupee{font-size:30px; font-weight:800; color:var(--faint); font-family:'Space Grotesk';}
+.amt-input-wrap input{
+  border:none; outline:none; font-size:44px; font-weight:800; width:220px; text-align:center;
+  font-family:'Space Grotesk'; background:none; color:var(--ink);
+}
+.amt-input-wrap input::placeholder{color:var(--line);}
+
+.select-row{display:flex; align-items:center; justify-content:space-between; padding:15px 4px; border-bottom:1px solid var(--line); cursor:pointer;}
+.picker-row{display:flex; align-items:center; gap:13px; padding:13px 6px; border-bottom:1px solid var(--line); cursor:pointer;}
+.picker-row:last-child{border-bottom:none;}
+.picker-row .pr-flag{width:34px; height:34px; border-radius:10px; background:var(--surface-2); display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:800; flex-shrink:0;}
+.picker-row .pr-mid{flex:1;}
+.picker-row .pr-mid b{display:block; font-size:14px; font-weight:700;}
+.picker-row .pr-mid span{font-size:12px; color:var(--muted); font-weight:600;}
+.picker-row .pr-check{width:22px; height:22px; border-radius:50%; border:1.5px solid var(--line); flex-shrink:0; display:flex; align-items:center; justify-content:center; transition:all .2s;}
+.picker-row.selected .pr-check{background:var(--primary); border-color:var(--primary); color:#fff;}
+
+.subcat-row{display:flex; align-items:center; justify-content:space-between; padding:13px 8px; border-bottom:1px solid var(--line); cursor:pointer; font-size:14px; font-weight:600; color:var(--ink);}
+.subcat-row:last-child{border-bottom:none;}
+.subcat-row.selected{color:var(--primary); font-weight:800;}
+.subcat-row .check-ico{color:var(--primary); opacity:0; transition:opacity .15s; font-weight:800;}
+.subcat-row.selected .check-ico{opacity:1;}
+.subcat-row.none-row{color:var(--muted); font-weight:700;}
+.subcat-row.none-row.selected{color:var(--primary);}
+.select-row:last-child{border-bottom:none;}
+.select-row .sr-label{font-size:12.5px; font-weight:700; color:var(--muted);}
+.select-row .sr-value{display:flex; align-items:center; gap:8px; font-size:14.5px; font-weight:700;}
+.select-row .sr-value .chev{color:var(--faint);}
+.pill-badge{display:inline-flex; align-items:center; gap:6px; background:var(--surface-2); padding:6px 12px; border-radius:var(--r-pill); font-size:13px; font-weight:700;}
+
+.grid3{display:grid; grid-template-columns:repeat(3,1fr); gap:12px;}
+.pick-tile{display:flex; flex-direction:column; align-items:center; gap:8px; padding:14px 8px; border-radius:var(--r-md); border:1.5px solid var(--line); background:var(--surface); cursor:pointer; transition:all .15s;}
+.pick-tile.selected{border-color:var(--primary); background:var(--primary-light);}
+.pick-tile .pt-ico{width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:18px;}
+.pick-tile span{font-size:12px; font-weight:700; text-align:center;}
+
+.textarea-field{width:100%; border:1.5px solid var(--line); border-radius:var(--r-md); padding:13px 15px; font-family:inherit; font-size:14px; resize:none; outline:none; min-height:70px; color:var(--ink); font-weight:500;}
+.textarea-field:focus{border-color:var(--primary);}
+
+.type-toggle{display:flex; background:var(--surface-2); border-radius:var(--r-pill); padding:4px; margin:10px 20px 4px; gap:4px;}
+.type-toggle button{flex:1; border:none; background:none; padding:11px; border-radius:var(--r-pill); font-weight:800; font-size:13.5px; color:var(--muted); cursor:pointer; transition:all .2s;}
+.type-toggle button.active{background:var(--surface); color:var(--ink); box-shadow:var(--shadow-sm);}
+
+/* success overlay */
+.success-overlay{position:absolute; top:0; right:0; bottom:0; left:0; background:rgba(255,255,255,0.96); z-index:60; display:flex; flex-direction:column; align-items:center; justify-content:center; opacity:0; visibility:hidden; transition:opacity .3s, visibility .3s;}
+.success-overlay.show{opacity:1; visibility:visible;}
+.check-circle{width:88px; height:88px; border-radius:50%; background:var(--primary-light); display:flex; align-items:center; justify-content:center; margin-bottom:20px;}
+.check-circle svg{width:46px; height:46px;}
+.check-circle path{stroke-dasharray:48; stroke-dashoffset:48; animation:draw .5s ease .15s forwards;}
+@keyframes draw{to{stroke-dashoffset:0;}}
+.success-overlay h3{font-size:18px; font-weight:800; margin:0 0 4px; opacity:0; animation:upIn .5s var(--ease) .3s forwards;}
+.success-overlay p{font-size:13.5px; color:var(--muted); margin:0; opacity:0; animation:upIn .5s var(--ease) .4s forwards;}
+
+/* toast */
+#toast{
+  position:absolute; left:20px; right:20px; bottom:100px; z-index:70; background:var(--ink); color:#fff;
+  padding:13px 16px; border-radius:var(--r-md); font-size:13.5px; font-weight:700; display:flex; align-items:center; gap:10px;
+  transform:translateY(30px); opacity:0; transition:all .3s var(--ease); box-shadow:var(--shadow-lg);
+}
+#toast.show{transform:translateY(0); opacity:1;}
+
+/* details screen */
+.detail-hero{padding:24px 20px 20px; text-align:center;}
+.detail-ico{width:64px; height:64px; border-radius:18px; display:flex; align-items:center; justify-content:center; font-size:28px; margin:0 auto 14px;}
+.detail-amt{font-family:'Space Grotesk'; font-size:32px; font-weight:800;}
+.detail-merchant{font-size:14.5px; color:var(--muted); font-weight:600; margin-top:4px;}
+.detail-list{margin:0 20px; padding:4px 0;}
+.detail-row{display:flex; justify-content:space-between; padding:14px 18px; border-bottom:1px solid var(--line); font-size:14px;}
+.detail-row:last-child{border-bottom:none;}
+.detail-row span:first-child{color:var(--muted); font-weight:600;}
+.detail-row span:last-child{font-weight:700;}
+.detail-actions{display:flex; gap:12px; padding:22px 20px 30px;}
+
+/* budget list */
+.budget-item{padding:16px 18px; border-bottom:1px solid var(--line);}
+.budget-item:last-child{border-bottom:none;}
+.bi-top{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;}
+.bi-top b{font-size:14.5px; font-weight:700;}
+.bi-nums{font-size:12.5px; color:var(--muted); font-weight:700;}
+.over-flag{display:flex; align-items:center; gap:5px; color:var(--red); font-size:11.5px; font-weight:800; margin-top:6px;}
+
+/* recurring / goals / cards items */
+.list-card-item{display:flex; align-items:center; gap:14px; padding:16px 18px; border-bottom:1px solid var(--line); cursor:pointer;}
+.list-card-item:last-child{border-bottom:none;}
+.lci-ico{width:44px; height:44px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0;}
+.lci-mid{flex:1;}
+.lci-mid b{display:block; font-size:14.5px; font-weight:700;}
+.lci-mid span{font-size:12px; color:var(--muted); font-weight:600;}
+.lci-right{text-align:right; font-size:13px; font-weight:800; color:var(--ink);}
+.lci-right small{display:block; font-size:11px; color:var(--muted); font-weight:600; margin-top:2px;}
+
+.goal-item{padding:18px; border-bottom:1px solid var(--line);}
+.goal-item:last-child{border-bottom:none;}
+.gi-top{display:flex; align-items:center; gap:12px; margin-bottom:12px;}
+.gi-ico{width:42px; height:42px; border-radius:13px; background:var(--purple-light); display:flex; align-items:center; justify-content:center; font-size:19px;}
+.gi-top b{font-size:15px; font-weight:800; display:block;}
+.gi-top span{font-size:12px; color:var(--muted); font-weight:600;}
+.gi-nums{display:flex; justify-content:space-between; font-size:12.5px; font-weight:700; margin-bottom:8px;}
+.gi-nums b{font-weight:800;}
+.gi-target{font-size:12px; color:var(--muted); font-weight:600; margin-top:8px;}
+
+/* credit card visual */
+.cc-visual{margin:6px 20px 16px; border-radius:20px; padding:20px 22px; background:linear-gradient(135deg,#2a2f6b,#4c3f9e); color:#fff; position:relative; overflow:hidden; box-shadow:var(--shadow-md);}
+.cc-visual::before{content:''; position:absolute; right:-30px; top:-30px; width:140px; height:140px; border-radius:50%; background:rgba(255,255,255,0.08);}
+.cc-visual .cv-bank{font-size:13px; font-weight:800; opacity:.85;}
+.cc-visual .cv-spent{font-size:26px; font-weight:800; font-family:'Space Grotesk'; margin:10px 0 4px;}
+.cc-visual .cv-limit{font-size:12px; opacity:.75; font-weight:600;}
+.cc-visual .cv-bar{height:6px; border-radius:99px; background:rgba(255,255,255,0.2); margin:14px 0 12px; overflow:hidden;}
+.cc-visual .cv-bar div{height:100%; background:#fff; border-radius:99px;}
+.cc-visual .cv-foot{display:flex; justify-content:space-between; font-size:12px; font-weight:700;}
+.cc-visual .cv-foot small{display:block; opacity:.7; font-weight:600; font-size:10.5px; margin-bottom:2px;}
+
+/* insights */
+.period-toggle{display:flex; background:var(--surface-2); border-radius:var(--r-pill); padding:4px; margin:14px 20px 0;}
+.period-toggle button{flex:1; border:none; background:none; padding:10px; border-radius:var(--r-pill); font-weight:800; font-size:13px; color:var(--muted); cursor:pointer;}
+.period-toggle button.active{background:var(--surface); color:var(--ink); box-shadow:var(--shadow-sm);}
+.chart-card{margin:18px 20px 0; padding:18px 18px 8px; border-radius:var(--r-lg);}
+.chart-card h4{font-size:14px; font-weight:800; margin:0 0 14px;}
+.bars{display:flex; align-items:flex-end; gap:10px; height:120px; padding:0 4px;}
+.bars .bar-col{flex:1; display:flex; flex-direction:column; align-items:center; gap:8px;}
+.bars .bar{width:100%; border-radius:6px 6px 3px 3px; background:var(--primary); height:4px; transition:height 1s var(--ease); max-width:26px;}
+.bars .bar-lbl{font-size:10.5px; color:var(--muted); font-weight:700;}
+.donut-wrap{display:flex; align-items:center; gap:18px; padding:6px 4px 16px;}
+.donut-legend{flex:1; display:flex; flex-direction:column; gap:9px;}
+.dl-row{display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700;}
+.dl-dot{width:9px; height:9px; border-radius:50%; flex-shrink:0;}
+.dl-row span{color:var(--muted); font-weight:600; margin-left:auto;}
+.insight-chip-list{display:flex; flex-direction:column; gap:10px; margin:16px 20px 0;}
+.insight-chip{display:flex; align-items:center; gap:12px; padding:14px 16px; border-radius:var(--r-md);}
+.insight-chip .ic-e{font-size:20px;}
+.insight-chip p{margin:0; font-size:13.5px; font-weight:700; line-height:1.4;}
+
+/* profile */
+.profile-head{display:flex; align-items:center; gap:14px; padding:18px 20px 22px;}
+.avatar{width:58px; height:58px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:800; font-family:'Space Grotesk';}
+.profile-head b{font-size:17px; font-weight:800; display:block;}
+.profile-head span{font-size:13px; color:var(--muted); font-weight:600;}
+.settings-group{margin:0 20px 20px;}
+.settings-label{font-size:12px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; padding:0 4px 8px;}
+.settings-row{display:flex; align-items:center; gap:13px; padding:14px 16px; border-bottom:1px solid var(--line); cursor:pointer;}
+.settings-row:last-child{border-bottom:none;}
+.settings-row .sr-ico{width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0;}
+.settings-row b{font-size:14px; font-weight:700; flex:1;}
+.settings-row .chev{color:var(--faint);}
+.toggle{width:44px; height:26px; border-radius:99px; background:var(--line); position:relative; cursor:pointer; flex-shrink:0; transition:background .2s;}
+.toggle.on{background:var(--primary);}
+.toggle::after{content:''; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; transition:transform .2s var(--ease); box-shadow:0 1px 3px rgba(0,0,0,0.25);}
+.toggle.on::after{transform:translateX(18px);}
+
+/* quick links grid */
+.quick-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:-4px;}
+.quick-tile{display:flex; flex-direction:column; align-items:center; gap:7px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-md); padding:13px 6px; font-size:11.5px; font-weight:700; color:var(--ink); cursor:pointer; box-shadow:var(--shadow-sm); transition:transform .15s var(--spring);}
+.quick-tile:active{transform:scale(0.93);}
+.quick-tile .qt-ico{width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:16px;}
+
+/* ===================== INVEST TAB ===================== */
+.invest-hero{margin:14px 20px 0; border-radius:var(--r-xl); padding:22px 22px 20px; background:linear-gradient(135deg,#1B2E63 0%, #3E63E0 60%, #6E8CF2 100%); color:#fff; position:relative; overflow:hidden; box-shadow:var(--shadow-md);}
+.invest-hero::before{content:'₹'; position:absolute; right:-16px; bottom:-46px; font-size:190px; opacity:.08; font-weight:800; font-family:'Space Grotesk';}
+.invest-hero .ih-label{font-size:12.5px; font-weight:700; opacity:.8;}
+.invest-hero .ih-amt{font-family:'Space Grotesk'; font-size:32px; font-weight:700; margin:6px 0 14px;}
+.invest-hero .ih-row{display:flex; gap:10px; position:relative; z-index:2;}
+.invest-hero .ih-item{flex:1; background:rgba(255,255,255,0.14); border-radius:14px; padding:10px 12px;}
+.invest-hero .ih-item .ihl{font-size:10.5px; opacity:.8; font-weight:700;}
+.invest-hero .ih-item .ihv{font-size:15px; font-weight:800; margin-top:3px; font-family:'Space Grotesk';}
+.invest-hero .ih-item .ihv.gain{color:#8CF5B9;}
+.invest-hero .ih-item .ihv.loss{color:#FFB4B4;}
+
+.invest-type-scroll{display:flex; gap:9px; overflow-x:auto; padding:2px 20px; margin:16px -20px 0; scrollbar-width:none;}
+.invest-type-scroll::-webkit-scrollbar{display:none;}
+.invest-chip{flex-shrink:0; display:flex; align-items:center; gap:7px; padding:10px 15px; border-radius:var(--r-pill); background:var(--surface); border:1.5px solid var(--line); font-size:13px; font-weight:800; cursor:pointer; color:var(--ink); transition:all .18s;}
+.invest-chip.active{background:var(--blue); border-color:var(--blue); color:#fff;}
+
+.holding-item{display:flex; align-items:center; gap:13px; padding:15px 18px; border-bottom:1px solid var(--line); cursor:pointer;}
+.holding-item:last-child{border-bottom:none;}
+.holding-ico{width:42px; height:42px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;}
+.holding-mid{flex:1; min-width:0;}
+.holding-mid b{display:block; font-size:14px; font-weight:700;}
+.holding-mid span{font-size:11.5px; color:var(--muted); font-weight:600;}
+.holding-right{text-align:right; flex-shrink:0;}
+.holding-right b{display:block; font-size:14px; font-weight:800; font-family:'Space Grotesk';}
+.holding-right span{font-size:11px; font-weight:800;}
+.holding-right span.gain{color:var(--green);}
+.holding-right span.loss{color:var(--red);}
+
+/* premium */
+#screen-premium{background:linear-gradient(180deg,#12261F 0%, #0B1712 40%, var(--bg) 40%);}
+.prem-hero{padding:34px 24px 10px; text-align:center; color:#fff;}
+.prem-badge{display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,0.12); padding:6px 14px; border-radius:99px; font-size:12px; font-weight:800; margin-bottom:16px; border:1px solid rgba(255,255,255,0.18);}
+.prem-hero h2{font-size:23px; font-weight:800; margin:0 0 8px; letter-spacing:-0.02em;}
+.prem-hero p{font-size:13.5px; opacity:.7; margin:0;}
+.prem-benefits{margin:22px 20px 0; background:var(--surface); border-radius:var(--r-lg); box-shadow:var(--shadow-md); padding:6px 4px;}
+.prem-b-row{display:flex; align-items:center; gap:12px; padding:12px 16px;}
+.prem-b-row .check{width:22px; height:22px; border-radius:50%; background:var(--primary-light); color:var(--primary); display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+.prem-b-row span{font-size:13.5px; font-weight:700;}
+.plan-row{display:flex; gap:12px; margin:20px 20px 0;}
+.plan-card{flex:1; border:2px solid var(--line); border-radius:var(--r-md); padding:16px 14px; text-align:center; cursor:pointer; position:relative; background:var(--surface);}
+.plan-card.selected{border-color:var(--primary); background:var(--primary-light);}
+.plan-card .badge{position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:var(--amber); color:#fff; font-size:9.5px; font-weight:800; padding:3px 9px; border-radius:99px;}
+.plan-card b{font-size:15px; font-weight:800; display:block;}
+.plan-card span{font-size:11.5px; color:var(--muted); font-weight:700;}
+
+/* scanner */
+.scan-frame{margin:30px 30px 0; height:340px; border-radius:24px; background:#12181c; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center;}
+.scan-frame img{width:100%; height:100%; object-fit:cover; opacity:.55;}
+.scan-line{position:absolute; left:8%; right:8%; height:3px; background:linear-gradient(90deg, transparent, #4fe3a1, transparent); box-shadow:0 0 16px 2px #4fe3a1; animation:scanmove 1.8s ease-in-out infinite;}
+@keyframes scanmove{0%{top:6%;}50%{top:92%;}100%{top:6%;}}
+.scan-corner{position:absolute; width:26px; height:26px; border:3px solid #4fe3a1;}
+.sc-tl{top:14px; left:14px; border-right:none; border-bottom:none; border-radius:8px 0 0 0;}
+.sc-tr{top:14px; right:14px; border-left:none; border-bottom:none; border-radius:0 8px 0 0;}
+.sc-bl{bottom:14px; left:14px; border-right:none; border-top:none; border-radius:0 0 0 8px;}
+.sc-br{bottom:14px; right:14px; border-left:none; border-top:none; border-radius:0 0 8px 0;}
+.scan-status{text-align:center; margin-top:22px; font-size:14px; font-weight:700; color:var(--muted);}
+.scan-options{display:flex; flex-direction:column; gap:12px; padding:34px 24px;}
+.scan-opt{display:flex; align-items:center; gap:14px; padding:16px 18px; border-radius:var(--r-lg); background:var(--surface); border:1px solid var(--line); cursor:pointer; box-shadow:var(--shadow-sm); color:var(--ink); text-align:left; width:100%; font-family:inherit;}
+.scan-opt .so-ico{width:44px; height:44px; border-radius:13px; background:var(--primary-light); color:var(--primary); display:flex; align-items:center; justify-content:center;}
+.scan-opt b{font-size:14.5px; font-weight:700;}
+.scan-result{margin:20px 20px 0; padding:20px; border-radius:var(--r-lg); background:var(--primary-light); border:1px solid #cdead9;}
+.scan-result .sr-head{display:flex; align-items:center; gap:8px; color:var(--primary); font-weight:800; font-size:14.5px; margin-bottom:16px;}
+.sr-field{display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid rgba(14,110,82,0.12); font-size:14px;}
+.sr-field:last-child{border-bottom:none;}
+.sr-field span:first-child{color:var(--muted); font-weight:600;}
+.sr-field span:last-child{font-weight:800;}
+
+/* notifications */
+.notif-item{display:flex; gap:13px; padding:15px 20px; border-bottom:1px solid var(--line); position:relative;}
+.notif-item.unread{background:var(--primary-light);}
+.notif-ico{width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0;}
+.notif-mid b{display:block; font-size:14px; font-weight:800; margin-bottom:2px;}
+.notif-mid p{margin:0; font-size:13px; color:var(--muted); line-height:1.4; font-weight:500;}
+
+/* confirm modal */
+.modal-overlay{position:absolute; top:0; right:0; bottom:0; left:0; background:rgba(10,20,15,0.5); z-index:80; display:flex; align-items:center; justify-content:center; opacity:0; visibility:hidden; transition:all .25s; padding:30px;}
+.modal-overlay.show{opacity:1; visibility:visible;}
+.modal-box{background:var(--surface); border-radius:var(--r-lg); padding:24px 22px; width:100%; text-align:center; transform:scale(.9); transition:transform .25s var(--ease); box-shadow:var(--shadow-lg);}
+.modal-overlay.show .modal-box{transform:scale(1);}
+.modal-box .mb-ico{width:56px; height:56px; border-radius:16px; background:var(--red-light); color:var(--red); display:flex; align-items:center; justify-content:center; margin:0 auto 14px;}
+.modal-box h3{font-size:16.5px; font-weight:800; margin:0 0 8px;}
+.modal-box p{font-size:13.5px; color:var(--muted); margin:0 0 20px; line-height:1.5;}
+.modal-actions{display:flex; gap:10px;}
+
+.hidden{display:none !important;}
+
+/* ================= ADS ================= */
+#device.ads-hidden .ad-slot{display:none !important;}
+
+.ad-tag{
+  position:absolute; top:10px; left:10px; background:rgba(20,24,18,0.55); color:#fff; font-size:9.5px; font-weight:800;
+  letter-spacing:.04em; text-transform:uppercase; padding:3px 7px; border-radius:5px; z-index:2;
+}
+#device[data-theme="dark"] .ad-tag{background:rgba(255,255,255,0.18);}
+
+/* banner ad */
+.ad-banner{
+  margin:16px 20px 0; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg);
+  box-shadow:var(--shadow-sm); padding:13px 14px 13px 14px; display:flex; align-items:center; gap:12px; position:relative;
+}
+.ad-banner-icon{width:44px; height:44px; border-radius:12px; background:var(--blue-light); display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0;}
+.ad-banner-mid{flex:1; min-width:0;}
+.ad-banner-mid b{display:block; font-size:13.5px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.ad-banner-mid span{font-size:11.5px; color:var(--muted); font-weight:600;}
+.ad-cta{background:var(--blue); color:#fff; border:none; border-radius:var(--r-pill); padding:9px 16px; font-size:12.5px; font-weight:800; cursor:pointer; flex-shrink:0; font-family:inherit;}
+.ad-remove-link{text-align:center; margin:6px 20px 0; font-size:11.5px; color:var(--faint); font-weight:700; cursor:pointer;}
+.ad-remove-link span{color:var(--primary);}
+
+/* native ad card */
+.native-ad-card{margin:0 20px 4px; background:var(--surface); border:1px dashed var(--line); border-radius:var(--r-lg); padding:16px 16px 14px; position:relative;}
+.native-ad-row{display:flex; align-items:center; gap:12px; margin-bottom:12px;}
+.native-ad-icon{width:42px; height:42px; border-radius:12px; background:var(--amber-light); display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0;}
+.native-ad-mid b{display:block; font-size:14px; font-weight:800;}
+.native-ad-mid span{font-size:11.5px; color:var(--muted); font-weight:600;}
+
+/* interstitial / rewarded full-screen ad overlays */
+.ad-fullscreen{
+  position:absolute; inset:0; background:#0E1410; z-index:92; display:flex; flex-direction:column;
+  opacity:0; visibility:hidden; transition:opacity .3s var(--ease), visibility .3s;
+}
+.ad-fullscreen.show{opacity:1; visibility:visible;}
+.ad-fs-top{display:flex; align-items:center; justify-content:space-between; padding:16px 16px 0;}
+.ad-fs-label{background:rgba(255,255,255,0.14); color:#fff; font-size:11px; font-weight:800; letter-spacing:.04em; padding:5px 10px; border-radius:6px; text-transform:uppercase;}
+.ad-fs-countdown{width:34px; height:34px; border-radius:50%; border:2px solid rgba(255,255,255,0.3); color:#fff; font-size:13px; font-weight:800; display:flex; align-items:center; justify-content:center;}
+.ad-fs-close{width:34px; height:34px; border-radius:50%; background:rgba(255,255,255,0.14); color:#fff; border:none; font-size:16px; display:flex; align-items:center; justify-content:center; cursor:pointer; opacity:0; transform:scale(.7); transition:all .25s var(--ease); pointer-events:none;}
+.ad-fs-close.ready{opacity:1; transform:scale(1); pointer-events:auto;}
+.ad-fs-body{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px 30px; text-align:center;}
+.ad-fs-art{width:160px; height:160px; border-radius:36px; background:linear-gradient(135deg,#3E63E0,#8B6EF0); display:flex; align-items:center; justify-content:center; font-size:64px; margin-bottom:26px; box-shadow:0 20px 50px -12px rgba(60,80,220,0.5);}
+.ad-fs-body h3{color:#fff; font-size:20px; font-weight:800; margin:0 0 8px;}
+.ad-fs-body p{color:rgba(255,255,255,0.6); font-size:13.5px; margin:0 0 26px; max-width:260px; line-height:1.5;}
+.ad-fs-cta{background:var(--blue); color:#fff; border:none; border-radius:var(--r-pill); padding:15px 34px; font-size:14.5px; font-weight:800; cursor:pointer; font-family:inherit;}
+.ad-fs-foot{padding:14px; text-align:center; color:rgba(255,255,255,0.35); font-size:11px; font-weight:700;}
+.ad-fs-progress{width:100%; max-width:260px; height:6px; border-radius:99px; background:rgba(255,255,255,0.15); overflow:hidden; margin:0 0 22px;}
+.ad-fs-progress div{height:100%; width:0%; background:linear-gradient(90deg,#4fe3a1,#3E63E0); border-radius:99px; transition:width .1s linear;}
+.ad-fs-reward{display:none; flex-direction:column; align-items:center;}
+.ad-fs-reward .reward-icon{width:88px; height:88px; border-radius:50%; background:rgba(79,227,161,0.15); display:flex; align-items:center; justify-content:center; font-size:44px; margin-bottom:20px; animation:markIn .5s var(--spring);}
+
+/* ================= RIPPLE ================= */
+.ripple-el{
+  position:absolute; border-radius:50%; background:rgba(14,110,82,0.16); transform:scale(0);
+  animation:rippleAnim .6s var(--ease); pointer-events:none; z-index:5;
+}
+#device[data-theme="dark"] .ripple-el{background:rgba(255,255,255,0.12);}
+#fab .ripple-el{background:rgba(255,255,255,0.35);}
+@keyframes rippleAnim{to{transform:scale(1); opacity:0;}}
+.fab-pop{animation:fabPop .4s var(--spring);}
+@keyframes fabPop{0%{transform:translateX(-50%) scale(1);}45%{transform:translateX(-50%) scale(0.82);}100%{transform:translateX(-50%) scale(1);}}
+
+/* ================= LEGAL SCREENS ================= */
+.legal-body{padding:6px 22px 40px; font-size:13.5px; line-height:1.7; color:var(--muted);}
+.legal-body h4{color:var(--ink); font-size:14.5px; font-weight:800; margin:20px 0 8px;}
+.legal-body h4:first-child{margin-top:4px;}
+.legal-body p{margin:0 0 10px;}
+.legal-updated{font-size:12px; color:var(--faint); font-weight:700; padding:0 22px 14px; text-transform:uppercase; letter-spacing:.03em;}
+
+/* ================= CHANGE PIN ================= */
+.pin-wrap{flex:1; display:flex; flex-direction:column; align-items:center; padding:20px 30px 30px;}
+.pin-sub{font-size:13.5px; color:var(--muted); font-weight:600; text-align:center; margin:6px 0 30px;}
+.pin-dots{display:flex; gap:16px; margin-bottom:14px;}
+.pin-dot{width:16px; height:16px; border-radius:50%; border:2px solid var(--line); transition:all .15s var(--ease);}
+.pin-dot.filled{background:var(--primary); border-color:var(--primary); transform:scale(1.1);}
+.pin-dots.shake{animation:pinShake .4s;}
+@keyframes pinShake{0%,100%{transform:translateX(0);}20%{transform:translateX(-10px);}40%{transform:translateX(8px);}60%{transform:translateX(-6px);}80%{transform:translateX(4px);}}
+.pin-error{color:var(--red); font-size:12.5px; font-weight:700; height:18px; margin-bottom:16px; opacity:0; transition:opacity .2s;}
+.pin-error.show{opacity:1;}
+.pin-keypad{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; width:100%; max-width:280px; margin-top:auto;}
+.pin-key{
+  aspect-ratio:1; border-radius:50%; border:1.5px solid var(--line); background:var(--surface);
+  font-size:22px; font-weight:700; color:var(--ink); cursor:pointer; display:flex; align-items:center; justify-content:center;
+  transition:transform .12s var(--ease), background .12s; font-family:'Space Grotesk';
+}
+.pin-key:active{transform:scale(0.9); background:var(--surface-2);}
+.pin-key-del{font-size:17px; border:none; background:none; box-shadow:none;}
+</style>
+</head>
+<body>
+
+<div id="device">
+  <div id="statusbar">
+    <span id="clock">9:41</span>
+    <div class="sb-icons">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M2 8h2v13H2zM7 5h2v16H7zM12 10h2v11h-2zM17 3h2v18h-2z" fill="currentColor"/></svg>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 20a2 2 0 100-4 2 2 0 000 4zM5.6 13.6a9 9 0 0112.8 0M2.5 10.5a13 13 0 0119 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>
+      <svg width="22" height="12" viewBox="0 0 24 12" fill="none"><rect x="1" y="1" width="19" height="10" rx="2.5" stroke="currentColor" stroke-width="1.4"/><rect x="2.5" y="2.5" width="14" height="7" rx="1.2" fill="currentColor"/><rect x="21.5" y="4" width="1.6" height="4" rx="0.8" fill="currentColor"/></svg>
+    </div>
+  </div>
+
+  <div class="viewport" id="viewport">
+
+    <!-- ============ SPLASH ============ -->
+    <div class="screen active" id="screen-splash">
+      <div class="splash-rings"><span></span><span></span><span></span></div>
+      <div class="splash-mark">
+        <svg viewBox="0 0 48 48" fill="none">
+          <circle cx="21" cy="27" r="15.5" stroke="#fff" stroke-width="2.4" opacity="0.95"/>
+          <path class="logo-rupee" d="M21 19.5v16M25.4 22.6c0-2-2.2-3.6-4.9-3.6s-4.9 1.4-4.9 3.2c0 2 2.3 2.7 4.9 3.2 2.7 0.5 4.9 1.4 4.9 3.5 0 2-2.2 3.6-4.9 3.6s-4.9-1.6-4.9-3.6" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <path class="logo-arrow" d="M30 9h8v8" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path class="logo-arrow" d="M38 9L28.5 18.5" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+      </div>
+      <div class="splash-title disp">Smart Expense</div>
+      <div class="splash-sub">Take control of your money.</div>
+      <div class="splash-progress"><div></div></div>
+    </div>
+
+    <!-- ============ ONBOARDING ============ -->
+    <div class="screen" id="screen-onboard">
+      <div class="ob-topbar">
+        <div class="ob-brand"><svg viewBox="0 0 48 48" fill="none"><circle cx="21" cy="27" r="15.5" stroke="var(--primary)" stroke-width="2.6"/><path d="M21 19.5v16M25.4 22.6c0-2-2.2-3.6-4.9-3.6s-4.9 1.4-4.9 3.2c0 2 2.3 2.7 4.9 3.2 2.7 0.5 4.9 1.4 4.9 3.5 0 2-2.2 3.6-4.9 3.6s-4.9-1.6-4.9-3.6" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M30 9h8v8" stroke="var(--primary)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M38 9L28.5 18.5" stroke="var(--primary)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg><span>Smart Expense</span></div>
+        <button class="ob-skip" onclick="goSetup()">Skip</button>
+      </div>
+      <div class="ob-track" id="obTrack">
+        <div class="ob-slide">
+          <div class="ob-visual" style="background:radial-gradient(circle at 30% 25%, var(--primary-light), var(--bg) 72%);">
+            <div class="ob-blob" style="background:var(--primary-light);"></div>
+            <div class="mini-card mc1"><div class="mc-ico" style="background:var(--red-light);">🍔</div><div class="mc-txt"><b>Swiggy</b><span>−₹450</span></div></div>
+            <div class="mini-card mc2"><div class="mc-ico" style="background:var(--blue-light);">🚗</div><div class="mc-txt"><b>Uber</b><span>−₹280</span></div></div>
+            <svg viewBox="0 0 24 24" fill="none" style="width:88px; height:88px; position:relative; z-index:1;"><path d="M4 19V5a2 2 0 012-2h9l5 5v11a2 2 0 01-2 2H6a2 2 0 01-2-2z" stroke="var(--primary)" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 13h8M8 17h5M8 9h3" stroke="var(--primary)" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </div>
+          <h2>Know where your money goes</h2>
+          <p>Track your daily spending and understand your financial habits.</p>
+        </div>
+        <div class="ob-slide">
+          <div class="ob-visual" style="background:radial-gradient(circle at 30% 25%, var(--amber-light), var(--bg) 72%);">
+            <div class="ob-blob" style="background:var(--amber-light);"></div>
+            <svg width="150" height="150" viewBox="0 0 150 150" style="position:relative; z-index:1;">
+              <circle cx="75" cy="75" r="58" fill="none" stroke="var(--surface-2)" stroke-width="12"/>
+              <circle class="ob-ring" cx="75" cy="75" r="58" fill="none" stroke="var(--amber)" stroke-width="12" stroke-linecap="round" stroke-dasharray="364" transform="rotate(-90 75 75)"/>
+              <text x="75" y="70" text-anchor="middle" font-family="Space Grotesk" font-size="22" font-weight="700" fill="var(--ink)">₹22,580</text>
+              <text x="75" y="90" text-anchor="middle" font-family="Manrope" font-size="11" font-weight="700" fill="var(--muted)">remaining</text>
+            </svg>
+          </div>
+          <h2>Stay within your budget</h2>
+          <p>Set monthly limits and get notified before you overspend.</p>
+        </div>
+        <div class="ob-slide">
+          <div class="ob-visual" style="background:radial-gradient(circle at 30% 25%, var(--purple-light), var(--bg) 72%);">
+            <div class="ob-blob" style="background:var(--purple-light);"></div>
+            <div class="ob-bars" style="position:relative; z-index:1;">
+              <div class="ob-bar" style="--h:34%;"></div>
+              <div class="ob-bar" style="--h:56%;"></div>
+              <div class="ob-bar" style="--h:78%;"></div>
+              <div class="ob-bar" style="--h:100%;"></div>
+              <div class="ob-goal-tag">🎯 Goal</div>
+            </div>
+          </div>
+          <h2>Build better saving habits</h2>
+          <p>Set goals and watch your savings grow.</p>
+        </div>
+        <div class="ob-slide">
+          <div class="ob-visual" style="background:radial-gradient(circle at 30% 25%, var(--blue-light), var(--bg) 72%);">
+            <div class="ob-blob" style="background:var(--blue-light);"></div>
+            <div class="ob-flow">
+              <div class="of-step of-step1"><span class="of-ico">₹</span>450</div>
+              <div class="of-step of-step2">🍔 Food</div>
+              <div class="of-step of-step3">📱 UPI</div>
+              <div class="of-check">✓ Saved</div>
+            </div>
+          </div>
+          <h2>Add an expense in seconds</h2>
+          <p>Amount → Category → Payment → Done. No forms, no friction — just fast, honest tracking.</p>
+        </div>
+      </div>
+      <div class="ob-bottom">
+        <div class="ob-progress"><div class="ob-seg active" id="seg0"></div><div class="ob-seg" id="seg1"></div><div class="ob-seg" id="seg2"></div><div class="ob-seg" id="seg3"></div></div>
+        <button class="btn btn-primary" id="obNextBtn" onclick="obNext()">Next</button>
+      </div>
+    </div>
+
+    <!-- ============ SETUP ============ -->
+    <div class="screen" id="screen-setup">
+      <div class="back-row"><h1>Let's personalize your finances</h1></div>
+      <div class="form-wrap">
+        <div class="field"><label>Name</label><input id="setupName" placeholder="Your name"></div>
+        <div class="field"><label>Monthly income</label><input id="setupIncome" type="number" placeholder="₹ 60,000"></div>
+        <div class="field"><label>Currency</label>
+          <div class="chip-row"><div class="chip selected">₹ INR</div></div>
+        </div>
+        <div class="field"><label>Starting monthly budget</label><input id="setupBudget" type="number" placeholder="₹ 40,000"></div>
+        <div class="field"><label>Preferred language</label>
+          <div class="chip-row">
+            <div class="chip selected" data-lang="English">English</div>
+            <div class="chip" data-lang="हिंदी">हिंदी</div>
+            <div class="chip" data-lang="বাংলা">বাংলা</div>
+          </div>
+        </div>
+        <div style="flex:1"></div>
+        <button class="btn btn-primary" onclick="finishSetup()">Continue</button>
+        <button class="btn btn-ghost" onclick="finishSetup()">Skip for now</button>
+      </div>
+    </div>
+
+    <!-- ============ MAIN APP ============ -->
+    <div class="screen" id="screen-main">
+      <div class="screen-scroll" id="mainScroll">
+
+        <!-- HOME -->
+        <div class="tab-panel active" id="tab-home">
+          <div class="home-header">
+            <div class="greet"><h2 id="greetName">Good morning, Avijit 👋</h2><span id="greetDate">Thursday, 14 August</span></div>
+            <button class="icon-btn" style="position:relative" onclick="showScreen('screen-notifications')">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M6 10a6 6 0 1112 0c0 5 2 6 2 6H4s2-1 2-6z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M10 20a2 2 0 004 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+              <span class="notif-dot" id="notifDot"></span>
+            </button>
+          </div>
+
+          <div class="balance-card">
+            <div class="balance-label">Available Balance</div>
+            <div class="balance-amt num" id="homeBalance">₹0</div>
+            <div class="balance-split">
+              <div class="bs-item"><div class="bsl">↓ Income</div><div class="bsv num" id="homeIncome">₹0</div></div>
+              <div class="bs-item"><div class="bsl">↑ Expenses</div><div class="bsv num" id="homeExpense">₹0</div></div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="card budget-card">
+              <div class="bc-top"><b id="homeBudgetTitle">August Budget</b></div>
+              <div class="bc-nums"><span id="homeBudgetSpent" class="num">₹0</span> / <span id="homeBudgetTotal" class="num">₹0</span></div>
+              <div class="progress" id="homeBudgetBar"><div style="width:0%"></div></div>
+              <div class="bc-remain num" id="homeBudgetRemain">₹0 remaining</div>
+              <button class="btn btn-outline btn-sm" style="margin-top:12px; width:100%;" onclick="showScreen('screen-budget')">View Budget</button>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-head"><h3>Spending Overview</h3></div>
+            <div class="cat-scroll" id="homeCatScroll"></div>
+          </div>
+
+          <div class="ad-banner ad-slot">
+            <div class="ad-tag">Ad</div>
+            <div class="ad-banner-icon">🎮</div>
+            <div class="ad-banner-mid"><b>Puzzle Quest — Play Free</b><span>Top rated puzzle game · Install now</span></div>
+            <button class="ad-cta" onclick="toast('Opening advertiser page…')">Install</button>
+          </div>
+          <div class="ad-remove-link ad-slot" onclick="showScreen('screen-premium')">Bothered by ads? <span>Remove them with Pro</span></div>
+
+          <div class="section">
+            <div class="section-head"><h3>Recent Transactions</h3><button class="link-btn" onclick="showTab('transactions')">See All</button></div>
+            <div class="card txn-list-card" id="homeTxnList"></div>
+          </div>
+
+          <div class="section" style="margin-bottom:6px;">
+            <div class="insight-card">
+              <div class="ic-tag">💡 SMART INSIGHT</div>
+              <p id="homeInsightText">You spent 18% more on food this week than your usual average.</p>
+              <button class="btn btn-primary btn-sm" onclick="showScreen('screen-insights')">View Insights</button>
+            </div>
+          </div>
+          <div style="height:26px;"></div>
+        </div>
+
+        <!-- TRANSACTIONS -->
+        <div class="tab-panel" id="tab-transactions">
+          <div class="topbar"><h1>Transactions</h1><button class="icon-btn" onclick="openSheet('sheet-filter')" id="txnFilterBtn"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>
+          <div class="search-bar">
+            <div class="search-input">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="var(--faint)" stroke-width="1.8"/><path d="M21 21l-4-4" stroke="var(--faint)" stroke-width="1.8" stroke-linecap="round"/></svg>
+              <input id="txnSearch" placeholder="Search transactions" oninput="renderTransactions()">
+            </div>
+          </div>
+          <div class="ad-banner ad-slot">
+            <div class="ad-tag">Ad</div>
+            <div class="ad-banner-icon" style="background:var(--primary-light);">💳</div>
+            <div class="ad-banner-mid"><b>Get 5% cashback everywhere</b><span>XYZ Bank Card · Sponsored</span></div>
+            <button class="ad-cta" onclick="toast('Opening advertiser page…')">Apply</button>
+          </div>
+          <div id="txnListWrap"></div>
+        </div>
+
+        <!-- INVEST -->
+        <div class="tab-panel" id="tab-invest">
+          <div class="topbar"><h1>Invest</h1><div style="width:40px"></div></div>
+          <div class="invest-hero">
+            <div class="ih-label">Total Portfolio Value</div>
+            <div class="ih-amt num" id="investTotal">₹0</div>
+            <div class="ih-row">
+              <div class="ih-item"><div class="ihl">Invested</div><div class="ihv num" id="investPrincipal">₹0</div></div>
+              <div class="ih-item"><div class="ihl">Total Returns</div><div class="ihv gain num" id="investGain">+₹0</div></div>
+            </div>
+          </div>
+          <div class="ad-banner ad-slot">
+            <div class="ad-tag">Ad</div>
+            <div class="ad-banner-icon" style="background:var(--amber-light);">📈</div>
+            <div class="ad-banner-mid"><b>Open a free Demat account</b><span>Zero brokerage on delivery · Sponsored</span></div>
+            <button class="ad-cta" onclick="toast('Opening advertiser page…')">Open</button>
+          </div>
+          <div class="invest-type-scroll" id="investTypeScroll"></div>
+          <div class="section" style="padding-top:16px;">
+            <div class="card" id="holdingsList"></div>
+          </div>
+          <div class="section" style="margin-top:16px;">
+            <button class="btn btn-primary" onclick="openSheet('sheet-add-investment')">+ Add Investment</button>
+          </div>
+          <div class="section" style="margin-top:10px;">
+            <p style="font-size:11.5px; color:var(--muted); line-height:1.6; text-align:center;">Mock data for prototyping only — not real market prices or financial advice.</p>
+          </div>
+          <div style="height:26px;"></div>
+        </div>
+
+        <!-- PROFILE -->
+        <div class="tab-panel" id="tab-profile">
+          <div class="topbar"><h1>Profile</h1><div style="width:40px"></div></div>
+          <div class="profile-head">
+            <div class="avatar" id="profileAvatar">A</div>
+            <div><b id="profileName">Avijit Roy</b><span id="profileSub">Free plan · ₹60,000/mo income</span></div>
+          </div>
+
+          <div class="section" style="padding-top:0;">
+            <button class="btn btn-primary" onclick="showScreen('screen-premium')">✨ Upgrade to Pro</button>
+          </div>
+
+          <div class="settings-group" style="margin-top:20px;">
+            <div class="settings-label">Account</div>
+            <div class="card">
+              <div class="settings-row" onclick="openProfileEdit()"><div class="sr-ico" style="background:var(--blue-light); color:var(--blue);">👤</div><b>Profile</b><span class="chev">›</span></div>
+              <div class="settings-row" onclick="toast('Backup complete ✓')"><div class="sr-ico" style="background:var(--primary-light); color:var(--primary);">☁️</div><b>Backup &amp; Restore</b><span class="chev">›</span></div>
+              <div class="settings-row" onclick="replayOnboarding()"><div class="sr-ico" style="background:var(--surface-2); color:var(--ink);">🔄</div><b>Replay Onboarding</b><span class="chev">›</span></div>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <div class="settings-label">Preferences</div>
+            <div class="card">
+              <div class="settings-row" onclick="openSheet('sheet-currency')"><div class="sr-ico" style="background:var(--amber-light); color:var(--amber);">₹</div><b>Currency</b><span class="chev num" id="currencyValue">INR ›</span></div>
+              <div class="settings-row" onclick="openSheet('sheet-language')"><div class="sr-ico" style="background:var(--purple-light); color:var(--purple);">🌐</div><b>Language</b><span class="chev" id="languageValue">English ›</span></div>
+              <div class="settings-row" onclick="toggleTheme(this)"><div class="sr-ico" style="background:var(--surface-2); color:var(--ink);">🌙</div><b>Dark theme</b><div class="toggle" id="themeToggle"></div></div>
+              <div class="settings-row" onclick="toggleRow(this)"><div class="sr-ico" style="background:var(--red-light); color:var(--red);">🔔</div><b>Notifications</b><div class="toggle on"></div></div>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <div class="settings-label">Security</div>
+            <div class="card">
+              <div class="settings-row" onclick="showScreen('screen-security')"><div class="sr-ico" style="background:var(--surface-2);">🔒</div><b>App Lock</b><span class="chev">›</span></div>
+              <div class="settings-row" onclick="toggleRow(this)"><div class="sr-ico" style="background:var(--surface-2);">🖐️</div><b>Fingerprint</b><div class="toggle"></div></div>
+              <div class="settings-row" onclick="openChangePin()"><div class="sr-ico" style="background:var(--surface-2);">🔢</div><b>PIN</b><span class="chev">›</span></div>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <div class="settings-label">Data</div>
+            <div class="card">
+              <div class="settings-row" onclick="exportData()"><div class="sr-ico" style="background:var(--blue-light); color:var(--blue);">📤</div><b>Export Data</b><span class="chev">›</span></div>
+              <div class="settings-row" onclick="toast('Choose a file to import')"><div class="sr-ico" style="background:var(--blue-light); color:var(--blue);">📥</div><b>Import Data</b><span class="chev">›</span></div>
+              <div class="settings-row" onclick="confirmDeleteAll()"><div class="sr-ico" style="background:var(--red-light); color:var(--red);">🗑️</div><b style="color:var(--red);">Delete All Data</b><span class="chev">›</span></div>
+            </div>
+          </div>
+
+          <div class="section" style="padding-bottom:0;">
+            <div class="section-head"><h3 style="font-size:14px; color:var(--muted);">Quick links</h3></div>
+            <div class="quick-grid">
+              <button class="quick-tile" onclick="showScreen('screen-budget')"><span class="qt-ico" style="background:var(--amber-light); color:var(--amber);">📊</span>Budget</button>
+              <button class="quick-tile" onclick="showScreen('screen-insights')"><span class="qt-ico" style="background:var(--blue-light); color:var(--blue);">📈</span>Insights</button>
+              <button class="quick-tile" onclick="showScreen('screen-cards')"><span class="qt-ico" style="background:var(--purple-light); color:var(--purple);">💳</span>Cards</button>
+              <button class="quick-tile" onclick="showScreen('screen-savings')"><span class="qt-ico" style="background:var(--primary-light); color:var(--primary);">🎯</span>Goals</button>
+              <button class="quick-tile" onclick="showScreen('screen-recurring')"><span class="qt-ico" style="background:var(--red-light); color:var(--red);">🔁</span>Recurring</button>
+              <button class="quick-tile" onclick="showScreen('screen-privacy')"><span class="qt-ico" style="background:var(--surface-2); color:var(--muted);">📄</span>Legal</button>
+            </div>
+          </div>
+          <div style="height:30px;"></div>
+        </div>
+
+      </div>
+
+      <button id="fab" onclick="openFabSheet(event)">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>
+      </button>
+      <div id="bottomnav">
+        <button class="nav-item active" data-tab="home" onclick="showTab('home', this)">
+          <span class="nav-ico-wrap"><svg viewBox="0 0 24 24" fill="none"><path d="M4 11l8-7 8 7v9a1 1 0 01-1 1h-4v-6H9v6H5a1 1 0 01-1-1v-9z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>
+          Home
+        </button>
+        <button class="nav-item" data-tab="transactions" onclick="showTab('transactions', this)">
+          <span class="nav-ico-wrap"><svg viewBox="0 0 24 24" fill="none"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+          Transactions
+        </button>
+        <div class="nav-spacer"></div>
+        <button class="nav-item" data-tab="invest" onclick="showTab('invest', this)">
+          <span class="nav-ico-wrap"><svg viewBox="0 0 24 24" fill="none"><path d="M3 17l6-6 4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 6h6v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          Invest
+        </button>
+        <button class="nav-item" data-tab="profile" onclick="showTab('profile', this)">
+          <span class="nav-ico-wrap"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.4" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 20c1.4-3.6 4.4-5.5 7.5-5.5s6.1 1.9 7.5 5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
+          Profile
+        </button>
+      </div>
+    </div>
+
+    <!-- ============ TRANSACTION DETAILS ============ -->
+    <div class="screen" id="screen-txndetail">
+      <div class="back-row"><button class="icon-btn" onclick="showScreen('screen-main')">←</button><h1>Details</h1></div>
+      <div id="txnDetailBody"></div>
+    </div>
+
+    <!-- ============ BUDGET (standalone) ============ -->
+    <div class="screen" id="screen-budget">
+      <div class="back-row"><button class="icon-btn" onclick="backToMain()">←</button><h1>Budget</h1></div>
+      <div class="screen-scroll">
+        <div class="section" style="padding-top:6px;">
+          <div class="card budget-card">
+            <div class="bc-top"><b id="budgetHeadTitle">August Budget</b><span class="num" style="font-weight:800; color:var(--primary); font-size:15px;" id="budgetPercent">0%</span></div>
+            <div class="bc-nums"><span class="num" id="budgetSpentTop">₹0</span> spent</div>
+            <div class="progress" id="budgetTopBar"><div style="width:0%"></div></div>
+            <div class="bc-remain num" id="budgetRemainTop">₹0 left</div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-head"><h3>Category Budgets</h3></div>
+          <div class="card" id="budgetListCard"></div>
+        </div>
+        <div class="section" style="margin-top:16px;">
+          <button class="btn btn-primary" onclick="openCreateBudget()">+ Add Budget</button>
+        </div>
+        <div class="section" style="margin-top:8px;">
+          <button class="btn btn-outline" onclick="showScreen('screen-recurring')">🔁 Recurring Payments</button>
+        </div>
+        <div style="height:26px;"></div>
+      </div>
+    </div>
+
+    <!-- ============ INSIGHTS (standalone) ============ -->
+    <div class="screen" id="screen-insights">
+      <div class="back-row"><button class="icon-btn" onclick="backToMain()">←</button><h1>Your Insights</h1></div>
+      <div class="screen-scroll">
+        <div class="period-toggle" id="periodToggle">
+          <button class="active" data-p="week" onclick="setPeriod('week')">Week</button>
+          <button data-p="month" onclick="setPeriod('month')">Month</button>
+          <button data-p="year" onclick="setPeriod('year')">Year</button>
+        </div>
+
+        <div class="card chart-card">
+          <h4>Spending Trend</h4>
+          <div class="bars" id="trendBars"></div>
+        </div>
+
+        <div class="card chart-card" style="margin-top:16px;">
+          <h4>Category Breakdown</h4>
+          <div class="donut-wrap">
+            <svg width="110" height="110" viewBox="0 0 110 110" id="donutSvg"></svg>
+            <div class="donut-legend" id="donutLegend"></div>
+          </div>
+        </div>
+
+        <div class="card chart-card" style="margin-top:16px;">
+          <h4>Income vs Expense</h4>
+          <div class="bars" id="ieBars" style="height:90px;"></div>
+        </div>
+
+        <div class="card chart-card" style="margin-top:16px; padding-bottom:16px;">
+          <h4>Payment Method Distribution</h4>
+          <div id="payDist"></div>
+        </div>
+
+        <div class="insight-chip-list">
+          <div class="insight-chip" style="background:var(--red-light);"><span class="ic-e">🍔</span><p>Food spending increased 18% compared to last period</p></div>
+          <div class="insight-chip" style="background:var(--purple-light);"><span class="ic-e">🛍</span><p>Shopping is your highest spending category</p></div>
+          <div class="insight-chip" style="background:var(--primary-light);"><span class="ic-e">💰</span><p id="insightSaved">You saved ₹12,400 this month</p></div>
+          <div class="insight-chip" style="background:var(--blue-light);"><span class="ic-e">📈</span><p>Your spending is lower than last month</p></div>
+        </div>
+        <div style="height:26px;"></div>
+      </div>
+    </div>
+
+    <!-- ============ RECURRING PAYMENTS ============ -->
+    <div class="screen" id="screen-recurring">
+      <div class="back-row"><button class="icon-btn" onclick="backToMain()">←</button><h1>Recurring Payments</h1></div>
+      <div class="screen-scroll">
+        <div class="section" style="padding-top:6px;">
+          <div class="card" id="recurringList"></div>
+        </div>
+        <div class="section" style="margin-top:16px;">
+          <button class="btn btn-primary" onclick="openSheet('sheet-add-recurring')">+ Add Recurring Payment</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ SAVINGS GOALS ============ -->
+    <div class="screen" id="screen-savings">
+      <div class="back-row"><button class="icon-btn" onclick="backToMain()">←</button><h1>Savings Goals</h1></div>
+      <div class="screen-scroll">
+        <div class="section" style="padding-top:6px;">
+          <div class="card" id="goalsList"></div>
+        </div>
+        <div class="section" style="margin-top:16px;">
+          <button class="btn btn-primary" onclick="openSheet('sheet-add-goal')">+ Create Goal</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ CREDIT CARDS ============ -->
+    <div class="screen" id="screen-cards">
+      <div class="back-row"><button class="icon-btn" onclick="backToMain()">←</button><h1>Credit Cards</h1></div>
+      <div class="screen-scroll" id="cardsList"></div>
+      <div class="section" style="margin-top:0;">
+        <button class="btn btn-primary" onclick="openSheet('sheet-add-card')">+ Add Card</button>
+      </div>
+    </div>
+
+    <!-- ============ NOTIFICATIONS ============ -->
+    <div class="screen" id="screen-notifications">
+      <div class="back-row"><button class="icon-btn" onclick="backToMain()">←</button><h1>Notifications</h1><button class="link-btn" style="margin-left:auto;" onclick="markAllRead()">Mark all read</button></div>
+      <div class="screen-scroll" id="notifList"></div>
+    </div>
+
+    <!-- ============ PROFILE EDIT ============ -->
+    <div class="screen" id="screen-profile-edit">
+      <div class="back-row"><button class="icon-btn" onclick="showScreen('screen-main'); showTab('profile');">←</button><h1>Edit Profile</h1></div>
+      <div class="form-wrap" style="padding-top:10px;">
+        <div style="display:flex; justify-content:center; margin-bottom:6px;">
+          <div class="avatar" id="peAvatar" style="width:76px; height:76px; font-size:26px;">A</div>
+        </div>
+        <div class="field"><label>Name</label><input id="peName" placeholder="Your name"></div>
+        <div class="field"><label>Monthly income</label><input id="peIncome" type="number" placeholder="₹ 60,000"></div>
+        <div class="field"><label>Monthly budget</label><input id="peBudget" type="number" placeholder="₹ 40,000"></div>
+        <div class="field"><label>Currency</label>
+          <div class="select-row" onclick="openSheet('sheet-currency')" style="border:1.5px solid var(--line); border-radius:var(--r-md); padding:14px 16px;">
+            <span class="sr-value" id="peCurrencyLabel">₹ INR</span><span class="chev">›</span>
+          </div>
+        </div>
+        <div class="field"><label>Preferred language</label>
+          <div class="select-row" onclick="openSheet('sheet-language')" style="border:1.5px solid var(--line); border-radius:var(--r-md); padding:14px 16px;">
+            <span class="sr-value" id="peLanguageLabel">English</span><span class="chev">›</span>
+          </div>
+        </div>
+        <div style="flex:1"></div>
+        <button class="btn btn-primary" onclick="saveProfileEdit()">Save Changes</button>
+      </div>
+    </div>
+
+    <!-- ============ SECURITY ============ -->
+    <div class="screen" id="screen-security">
+      <div class="back-row"><button class="icon-btn" onclick="showScreen('screen-main'); showTab('profile');">←</button><h1>App Lock</h1></div>
+      <div class="section">
+        <div class="card">
+          <div class="settings-row" onclick="toggleRow(this)"><div class="sr-ico" style="background:var(--surface-2);">🔒</div><b>Require lock on open</b><div class="toggle on"></div></div>
+          <div class="settings-row" onclick="toggleRow(this)"><div class="sr-ico" style="background:var(--surface-2);">🖐️</div><b>Use fingerprint</b><div class="toggle on"></div></div>
+          <div class="settings-row" onclick="openChangePin()"><div class="sr-ico" style="background:var(--surface-2);">🔢</div><b>Change PIN</b><span class="chev">›</span></div>
+        </div>
+      </div>
+      <div class="section"><p style="font-size:12.5px; color:var(--muted); line-height:1.6;">Your PIN and biometric data never leave this device. Smart Expense never asks for your bank passwords.</p></div>
+    </div>
+
+    <!-- ============ CHANGE PIN ============ -->
+    <div class="screen" id="screen-changepin">
+      <div class="back-row"><button class="icon-btn" onclick="showScreen('screen-security')">←</button><h1 id="pinScreenTitle">Enter New PIN</h1></div>
+      <div class="pin-wrap">
+        <p class="pin-sub" id="pinSubtext">Choose a 4-digit PIN to lock the app.</p>
+        <div class="pin-dots" id="pinDots">
+          <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+        </div>
+        <div class="pin-error" id="pinError">PINs don't match — try again.</div>
+        <div class="pin-keypad" id="pinKeypad">
+          <button class="pin-key" onclick="pinPress('1')">1</button>
+          <button class="pin-key" onclick="pinPress('2')">2</button>
+          <button class="pin-key" onclick="pinPress('3')">3</button>
+          <button class="pin-key" onclick="pinPress('4')">4</button>
+          <button class="pin-key" onclick="pinPress('5')">5</button>
+          <button class="pin-key" onclick="pinPress('6')">6</button>
+          <button class="pin-key" onclick="pinPress('7')">7</button>
+          <button class="pin-key" onclick="pinPress('8')">8</button>
+          <button class="pin-key" onclick="pinPress('9')">9</button>
+          <div></div>
+          <button class="pin-key" onclick="pinPress('0')">0</button>
+          <button class="pin-key pin-key-del" onclick="pinBackspace()">⌫</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ PRIVACY POLICY ============ -->
+    <div class="screen" id="screen-privacy">
+      <div class="back-row"><button class="icon-btn" onclick="showScreen('screen-main'); showTab('profile');">←</button><h1>Privacy Policy</h1></div>
+      <div class="legal-updated">Last updated · August 2026</div>
+      <div class="legal-body">
+        <h4>What we collect</h4>
+        <p>Smart Expense stores the transactions, budgets, and goals you enter directly on your device. In this prototype, nothing leaves your phone — there is no server and no account required.</p>
+        <h4>How your data is used</h4>
+        <p>Your data is used only to power the app's own features: balances, budgets, insights, and reminders. We never sell your financial information or share it with advertisers.</p>
+        <h4>Screenshots &amp; receipts</h4>
+        <p>When you scan a payment screenshot or receipt, it's processed to detect amount, merchant, and category. Images are not uploaded anywhere in this prototype.</p>
+        <h4>Your controls</h4>
+        <p>You can export or permanently delete all app data at any time from Profile → Data. Deleting data removes it immediately and cannot be undone.</p>
+        <h4>Contact</h4>
+        <p>For questions about this policy, reach out at privacy@smartexpense.app.</p>
+        <button class="btn btn-outline btn-sm" style="margin-top:8px;" onclick="showScreen('screen-terms')">Read Terms &amp; Conditions</button>
+      </div>
+    </div>
+
+    <!-- ============ TERMS & CONDITIONS ============ -->
+    <div class="screen" id="screen-terms">
+      <div class="back-row"><button class="icon-btn" onclick="showScreen('screen-privacy')">←</button><h1>Terms &amp; Conditions</h1></div>
+      <div class="legal-updated">Last updated · August 2026</div>
+      <div class="legal-body">
+        <h4>Using Smart Expense</h4>
+        <p>Smart Expense helps you track spending, budgets, and savings for personal use. By using the app you agree to enter accurate information and use it lawfully.</p>
+        <h4>Not financial advice</h4>
+        <p>Insights, budgets, and investment figures shown in the app — including mutual funds, SIPs, stocks, PPF, and fixed deposits — are for informational purposes only and don't constitute financial or investment advice.</p>
+        <h4>Prototype disclaimer</h4>
+        <p>This build is a design prototype. Balances, market values, and returns are mock data and don't reflect real accounts or live market prices.</p>
+        <h4>Limitation of liability</h4>
+        <p>Smart Expense is provided "as is" without warranties of any kind. We aren't liable for decisions made based on the app's figures.</p>
+        <h4>Changes</h4>
+        <p>We may update these terms as the app evolves. Continued use after changes means you accept the updated terms.</p>
+      </div>
+    </div>
+
+    <!-- ============ PREMIUM ============ -->
+    <div class="screen" id="screen-premium">
+      <div class="back-row" style="position:relative; z-index:2;"><button class="icon-btn" onclick="backToMain()" style="background:rgba(255,255,255,0.14); color:#fff;">←</button></div>
+      <div class="prem-hero">
+        <div class="prem-badge">✨ SMART EXPENSE PRO</div>
+        <h2 class="disp">Spend smarter with Pro</h2>
+        <p>Unlock the full power of your money, ad-free.</p>
+      </div>
+      <div class="prem-benefits">
+        <div class="prem-b-row"><div class="check">✓</div><span>No Ads</span></div>
+        <div class="prem-b-row"><div class="check">✓</div><span>Screenshot → Expense</span></div>
+        <div class="prem-b-row"><div class="check">✓</div><span>Advanced Insights</span></div>
+        <div class="prem-b-row"><div class="check">✓</div><span>Unlimited Budgets</span></div>
+        <div class="prem-b-row"><div class="check">✓</div><span>PDF &amp; CSV Reports</span></div>
+        <div class="prem-b-row"><div class="check">✓</div><span>Cloud Backup</span></div>
+        <div class="prem-b-row"><div class="check">✓</div><span>Unlimited Savings Goals</span></div>
+      </div>
+      <div class="plan-row">
+        <div class="plan-card" data-plan="monthly" onclick="selectPlan(this)"><b class="num">₹99</b><span>per month</span></div>
+        <div class="plan-card selected" data-plan="yearly" onclick="selectPlan(this)"><div class="badge">BEST VALUE</div><b class="num">₹699</b><span>per year</span></div>
+      </div>
+      <div class="section">
+        <button class="btn btn-primary" onclick="startPro()">Start Pro</button>
+        <button class="btn btn-outline" onclick="openRewardedAd()">🎬 Watch an ad — try Pro free for 24h</button>
+        <button class="btn btn-ghost" onclick="toast('No purchase found to restore')">Restore Purchase</button>
+      </div>
+      <div style="height:20px;"></div>
+    </div>
+
+    <!-- ============ SCANNER ============ -->
+    <div class="screen" id="screen-scanner">
+      <div class="back-row"><button class="icon-btn" onclick="resetScanner(); showScreen('screen-main');"><span id="scannerBackIcon">←</span></button><h1>Scan Payment</h1></div>
+      <div id="scanStep1">
+        <div class="scan-options">
+          <div class="scan-opt" onclick="startScan()"><div class="so-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M3 15l5-4 4 3 5-5 4 4" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></div><b>Upload Screenshot</b></div>
+          <div class="scan-opt" onclick="startScan()"><div class="so-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 8a2 2 0 012-2h1l1.5-2h7L17 6h1a2 2 0 012 2v9a2 2 0 01-2 2H6a2 2 0 01-2-2V8z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.4" stroke="currentColor" stroke-width="1.7"/></svg></div><b>Take Photo</b></div>
+          <div class="scan-opt" onclick="startScan()"><div class="so-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6 3h9l3 3v15H6V3z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M9 10h6M9 14h6M9 18h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></div><b>Upload Receipt</b></div>
+        </div>
+      </div>
+      <div id="scanStep2" class="hidden">
+        <div class="scan-frame">
+          <img src="https://images.unsplash.com/photo-1556742393-d75f468bfcb0?w=400&h=700&fit=crop" alt="">
+          <div class="scan-line"></div>
+          <div class="scan-corner sc-tl"></div><div class="scan-corner sc-tr"></div>
+          <div class="scan-corner sc-bl"></div><div class="scan-corner sc-br"></div>
+        </div>
+        <div class="scan-status" id="scanStatusText">Reading payment details…</div>
+      </div>
+      <div id="scanStep3" class="hidden">
+        <div class="scan-result">
+          <div class="sr-head"><span>✓</span> Payment Detected</div>
+          <div class="sr-field"><span>Amount</span><span class="num">₹780</span></div>
+          <div class="sr-field"><span>Merchant</span><span>Blinkit</span></div>
+          <div class="sr-field"><span>Date</span><span>14 Aug 2026</span></div>
+          <div class="sr-field"><span>Payment</span><span>UPI</span></div>
+          <div class="sr-field"><span>Suggested Category</span><span>🛒 Groceries</span></div>
+        </div>
+        <div class="section">
+          <button class="btn btn-primary" onclick="saveScanExpense()">Save Expense</button>
+          <button class="btn btn-ghost" onclick="toast('Opening editable form…')">Edit Details</button>
+        </div>
+      </div>
+      <div id="scanStep4" class="hidden">
+        <div class="empty-state" style="padding-top:70px;">
+          <div class="es-ico" style="background:var(--red-light);">⚠️</div>
+          <h4>Something went wrong</h4>
+          <p>Unable to process the screenshot. Please try again.</p>
+          <button class="btn btn-primary btn-sm" onclick="resetScanner()">Retry</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /viewport -->
+
+  <!-- ================= OVERLAYS: SHEETS ================= -->
+  <div class="overlay" id="overlay" onclick="closeAllSheets()"></div>
+
+  <!-- Add type -->
+  <div class="sheet" id="sheet-add-type">
+    <div class="sheet-drag"></div>
+    <div class="sheet-head"><h3>What would you like to add?</h3><button class="icon-btn" onclick="closeAllSheets()">✕</button></div>
+    <div class="sheet-body" style="display:flex; flex-direction:column; gap:12px;">
+      <button class="scan-opt" onclick="openAddExpense()"><div class="so-ico" style="background:var(--red-light); color:var(--red);">↑</div><b>Expense</b></button>
+      <button class="scan-opt" onclick="openAddIncome()"><div class="so-ico" style="background:var(--primary-light); color:var(--primary);">↓</div><b>Income</b></button>
+      <button class="scan-opt" onclick="closeAllSheets(); resetScanner(); showScreen('screen-scanner');"><div class="so-ico" style="background:var(--blue-light); color:var(--blue);">⚡</div><b>Scan Payment Screenshot</b></button>
+    </div>
+  </div>
+
+  <!-- Add expense -->
+  <div class="sheet" id="sheet-add-expense" style="max-height:92%;">
+    <div class="sheet-drag"></div>
+    <div class="sheet-head"><h3>Add Expense</h3><button class="icon-btn" onclick="closeAllSheets()">✕</button></div>
+    <div class="sheet-body">
+      <div class="amt-input-wrap"><span class="rupee">₹</span><input type="number" id="expAmount" placeholder="0" inputmode="decimal"></div>
+      <div class="select-row" onclick="openSheet('sheet-category')">
+        <div><div class="sr-label">CATEGORY</div><div class="sr-value"><span id="expCatIcon">🍔</span><span id="expCatLabel">Food</span></div></div>
+        <span class="chev">›</span>
+      </div>
+      <div class="select-row" onclick="openSubcategorySheet()">
+        <div><div class="sr-label">SUBCATEGORY</div><div class="sr-value" id="expSubcatLabel" style="color:var(--faint);">Optional</div></div>
+        <span class="chev">›</span>
+      </div>
+      <div class="select-row" onclick="openSheet('sheet-payment')">
+        <div><div class="sr-label">PAYMENT METHOD</div><div class="sr-value"><span id="expPayLabel">UPI</span></div></div>
+        <span class="chev">›</span>
+      </div>
+      <div class="select-row" style="cursor:default;">
+        <div style="flex:1"><div class="sr-label">DATE</div><input type="date" id="expDate" style="border:none; font-size:14.5px; font-weight:700; font-family:inherit; outline:none; padding:2px 0; width:100%;"></div>
+      </div>
+      <div class="select-row" style="cursor:default;">
+        <div style="flex:1"><div class="sr-label">MERCHANT</div><input type="text" id="expMerchant" placeholder="e.g. Swiggy" style="border:none; font-size:14.5px; font-weight:700; font-family:inherit; outline:none; padding:2px 0; width:100%;"></div>
+      </div>
+      <div style="margin-top:14px;">
+        <div class="sr-label" style="margin-bottom:8px;">NOTE (OPTIONAL)</div>
+        <div class="chip-row" id="expNoteChips" style="margin-bottom:10px;"></div>
+        <textarea class="textarea-field hidden" id="expNote" placeholder="Type your own note…"></textarea>
+      </div>
+      <div class="select-row" onclick="toast('Receipt attached (mock)')" style="margin-top:6px;">
+        <div><div class="sr-label">RECEIPT</div><div class="sr-value">📎 Attach receipt</div></div><span class="chev">›</span>
+      </div>
+    </div>
+    <div class="sheet-foot"><button class="btn btn-primary" onclick="saveExpense()">Save Expense</button></div>
+  </div>
+
+  <!-- Add income -->
+  <div class="sheet" id="sheet-add-income" style="max-height:88%;">
+    <div class="sheet-drag"></div>
+    <div class="sheet-head"><h3>Add Income</h3><button class="icon-btn" onclick="closeAllSheets()">✕</button></div>
+    <div class="sheet-body">
+      <div class="amt-input-wrap"><span class="rupee">₹</span><input type="number" id="incAmount" placeholder="0" inputmode="decimal"></div>
+      <div class="select-row" onclick="openSheet('sheet-income-source')">
+        <div><div class="sr-label">INCOME SOURCE</div><div class="sr-value"><span id="incSourceIcon">💼</span><span id="incSourceLabel">Salary</span></div></div>
+        <span class="chev">›</span>
+      </div>
+      <div class="select-row" style="cursor:default;">
+        <div style="flex:1"><div class="sr-label">DATE</div><input type="date" id="incDate" style="border:none; font-size:14.5px; font-weight:700; font-family:inherit; outline:none; padding:2px 0; width:100%;"></div>
+      </div>
+      <div style="margin-top:14px;">
+        <div class="sr-label" style="margin-bottom:8px;">NOTE (OPTIONAL)</div>
+        <textarea class="textarea-field" id="incNote" placeholder="Add a note…"></textarea>
+      </div>
+    </div>
+    <div class="sheet-foot"><button class="btn btn-primary" onclick="saveIncome()">Save Income</button></div>
+  </div>
+
+  <!-- Category picker -->
+  <div class="sheet" id="sheet-category">
+    <div class="sheet-drag"></div>
+    <div class="sheet-head"><h3>Choose Category</h3><button class="icon-btn" onclick="closeSheet('sheet-category')">✕</button></div>
+    <div class="sheet-body"><div class="grid3" id="categoryGrid"></div></div>
+  </div>
+
+  <!-- Subcategory picker -->
+  <div class="sheet" id="sheet-subcategory" style="max-height:85%;">
+    <div class="sheet-drag"></div>
+    <div class="sheet-head"><h3 id="subcatSheetTitle">Choose Subcategory</h3><button class="icon-btn" onclick="closeSheet('sheet-subcategory')">✕</button></div>
+    <div class="sheet-body">
+      <div class="search-input" style="margin-bottom:6px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="var(--faint)" stroke-width="1.8"/><path d="M21 21l-4-4" stroke="var(--faint)" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <input id="subcatSearch" placeholder="Search subcategory" oninput="renderSubcategoryList()">
+      </div>
+      <div id="subcategoryList"></div>
+    </div>
+  </div>
+
+  <!-- Payment picker -->
+  <div class="sheet" id="sheet-payment">
+    <div class="sheet-drag"></div>
+    <div class="sheet-head"><h3>Payment Method</h3><button class="icon-btn" onclick="closeSheet('sheet-payment')">✕</button></div>
+    <div class="sheet-body"><div class="grid3" id="paymentGrid"></div></div>
+  </div>
+
+  <!-- Income source picker -->
+  <div class="sheet" id="sheet-income-source">
+    <div class="sheet-drag"></div>
+    <div class="sheet-head"><h3>Income Source</h3><button class="icon-btn" onclick="closeSheet('sheet-income-source')">✕</button></div>
+    <div class="sheet-body"><div class="grid3" id="incomeSourceGrid"></div></div>
+  </div>
+
+  <!-- Filter sheet -->
+  <div class="sheet" id="sheet-filter">
+    <div class="sheet-drag"></div>
+    <div class="sheet-head"><h3>Filter Transactions</h3><button class="icon-btn" onclick="closeSheet('sheet-filter')">✕</button></div>
+    <div class="sheet-body">
+      <div class="sr-label" style="margin:6px 0 8px;">DATE RANGE</div>
+      <div class="chip-row" id="filterDateRange">
+        <div class="chip selected" data-v="all">All time</div><div class="chip" data-v="today">Today</div><div class="chip" data-v="week">This week</div><div class="chip" data-v="month">This month</div>
+      </div>
+      <div class="sr-label" style="margin:20px 0 8px;">TRANSACTION TYPE</div>
+      <div class="chip-row" id="filterType">
+        <div class="chip selected" data-v="all">All</div><div class="chip" data-v="expense">Expense</div><div class="chip" data-v="income">Income</div>
+      </div>
+      <div class="sr-label" style="margin:20px 0 8px;">CATEGORY</div>
+      <div class="chip-row" id="filterCategory"></div>
+      <div class="sr-label" style="margin:20px 0 8px;">PAYMENT METHOD</div>
+      <div class="chip-row" id="filterPayment"></div>
+      <div class="sr-label" style="margin:20px 0 8px;">AMOUNT RANGE</div>
+      <div style="display:flex; gap:10px;">
+        <input type="number" id="filterMin" placeholder="Min ₹" class="fmoney">
+        <input type="number" id="filterMax" placeholder="Max ₹" class="fmoney">
+      </div>
+    </div>
+    <div class="sheet-foot" style="display:flex; gap:12px;">
+      <button class="btn btn-outline" onclick="resetFilters()">Reset</button>
+      <button class="btn btn-primary" onclick="applyFilters()">Apply Filters</button>
+    </div>
+  </div>
+
+  <!-- Create budget -->
+  <div class="sheet" id="sheet-create-budget" style="max-height:92%;">
+    <div class="sheet-drag"></div>
+    <div class="sheet-head"><h3>Create Budget</h3><button class="icon-btn" onclick="closeSheet('sheet-create-budget')">✕</button></div>
+    <div class="sheet-body">
+      <div class="field"><label>Budget name</label><input id="cbName" placeholder="e.g. Groceries budget"></div>
+      <div class="field" style="margin-top:14px;"><label>Monthly limit</label><input id="cbLimit" type="number" placeholder="₹ 5,000"></div>
+      <div class="field" style="margin-top:14px;"><label>Category</label></div>
+      <div class="grid3" id="cbCategoryGrid"></div>
+      <div class="field" style="margin-top:14px;"><label>Start date</label><input id="cbStart" type="date"></div>
+      <div class="select-row" onclick="toggleRow(this.querySelector('.toggle'))" style="margin-top:6px;">
+        <b>Repeat monthly</b><div class="toggle on"></div>
+      </div>
+    </div>
+    <div class="sheet-foot"><button class="btn btn-primary" onclick="createBudget()">Create Budget</button></div>
+  </div>
+
+  <!-- Add recurring -->
+  <div class="sheet" id="sheet-add-recurring" style="max-height:94%;">
+    <div class="sheet-drag"></div>
+    <div class="sheet-head"><h3>Add Recurring Payment</h3><button class="icon-btn" onclick="closeSheet('sheet-add-recurring')">✕</button></div>
+    <div class="sheet-body">
+      <div class="field"><label>Name</label><input id="rpName" placeholder="e.g. Netflix"></div>
+      <div class="field" style="margin-top:14px;"><label>Amount</label><input id="rpAmount" type="number" placeholder="₹ 649"></div>
+      <div class="field" style="margin-top:14px;"><label>Category</label></div>
+      <div class="grid3" id="rpCategoryGrid"></div>
+      <div class="field" style="margin-top:14px;"><label>Frequency</label>
+        <div class="chip-row" id="rpFrequency">
+          <div class="chip" data-v="Weekly">Weekly</div><div class="chip selected" data-v="Monthly">Monthly</div><div class="chip" data-v="Yearly">Yearly</div>
+        </div>
+      </div>
+      <div class="field" style="margin-top:14px;"><label>Next payment date</label><input id="rpDate" type="date"></div>
+      <div class="field" style="margin-top:14px;"><label>Payment method</label>
+        <div class="chip-row" id="rpPayment">
+          <div class="chip selected" data-v="UPI">UPI</div><div class="chip" data-v="Cash">Cash</div><div class="chip" data-v="Debit Card">Debit Card</div><div class="chip" data-v="Credit Card">Credit Card</div><div class="chip" data-v="Bank Transfer">Bank Transfer</div><div class="chip" data-v="Wallet">Wallet</div>
+        </div>
+      </div>
+      <div class="field" style="margin-top:14px;"><label>Reminder</label>
+        <div class="chip-row" id="rpReminder">
+          <div class="chip" data-v="1">1 day before</div><div class="chip selected" data-v="3">3 days before</div><div class="chip" data-v="7">7 days before</div>
+        </div>
+      </div>
+    </div>
+    <div class="sheet-foot"><button class="btn btn-primary" onclick="saveRecurring()">Save Payment</button></div>
+  </div>
+
+  <!-- Add goal -->
+  <div class="sheet" id="sheet-add-goal" style="max-height:92%;">
+    <div class="sheet-drag"></div>
+    <div class="sheet-head"><h3>Create Savings Goal</h3><button class="icon-btn" onclick="closeSheet('sheet-add-goal')">✕</button></div>
+    <div class="sheet-body">
+      <div class="field"><label>Goal name</label><input id="glName" placeholder="e.g. New Laptop"></div>
+      <div class="field" style="margin-top:14px;"><label>Target amount</label><input id="glTarget" type="number" placeholder="₹ 80,000"></div>
+      <div class="field" style="margin-top:14px;"><label>Current savings</label><input id="glCurrent" type="number" placeholder="₹ 0"></div>
+      <div class="field" style="margin-top:14px;"><label>Target date</label><input id="glDate" type="date"></div>
+      <div class="field" style="margin-top:14px;"><label>Icon</label></div>
+      <div class="grid3" id="glIconGrid"></div>
+    </div>
+    <div class="sheet-foot"><button class="btn btn-primary" onclick="createGoal()">Create Goal</button></div>
+  </div>
+
+  <!-- Add card -->
+  <div class="sheet" id="sheet-add-card" style="max-height:92%;">
+    <div class="sheet-drag"></div>
+    <div class="sheet-head"><h3>Add Credit Card</h3><button class="icon-btn" onclick="closeSheet('sheet-add-card')">✕</button></div>
+    <div class="sheet-body">
+      <div class="field"><label>Card name</label><input id="ccName" placeholder="e.g. HDFC Credit Card"></div>
+      <div class="field" style="margin-top:14px;"><label>Bank</label><input id="ccBank" placeholder="e.g. HDFC Bank"></div>
+      <div class="field" style="margin-top:14px;"><label>Credit limit</label><input id="ccLimit" type="number" placeholder="₹ 1,00,000"></div>
+      <div class="field" style="margin-top:14px;"><label>Statement date</label><input id="ccStatement" type="date"></div>
+      <div class="field" style="margin-top:14px;"><label>Payment due date</label><input id="ccDue" type="date"></div>
+      <div class="field" style="margin-top:14px;"><label>Current bill</label><input id="ccBill" type="number" placeholder="₹ 15,620"></div>
+    </div>
+    <div class="sheet-foot"><button class="btn btn-primary" onclick="saveCard()">Save Card</button></div>
+  </div>
+
+  <!-- Add investment -->
+  <div class="sheet" id="sheet-add-investment" style="max-height:92%;">
+    <div class="sheet-drag"></div>
+    <div class="sheet-head"><h3>Add Investment</h3><button class="icon-btn" onclick="closeSheet('sheet-add-investment')">✕</button></div>
+    <div class="sheet-body">
+      <div class="sr-label" style="margin-bottom:8px;">TYPE</div>
+      <div class="grid3" id="invTypeGrid"></div>
+      <div class="field" style="margin-top:16px;"><label id="invNameLabel">Fund / stock name</label><input id="invName" placeholder="e.g. Axis Bluechip Fund"></div>
+      <div class="field" style="margin-top:14px;"><label>Invested amount</label><input id="invInvested" type="number" placeholder="₹ 20,000"></div>
+      <div class="field" style="margin-top:14px;"><label>Current value</label><input id="invCurrent" type="number" placeholder="₹ 22,400"></div>
+      <div class="field hidden" id="invSipField" style="margin-top:14px;"><label>Monthly SIP amount</label><input id="invSipAmount" type="number" placeholder="₹ 2,000"></div>
+    </div>
+    <div class="sheet-foot"><button class="btn btn-primary" onclick="saveInvestment()">Add to Portfolio</button></div>
+  </div>
+
+  <!-- Currency picker -->
+  <div class="sheet" id="sheet-currency" style="max-height:80%;">
+    <div class="sheet-drag"></div>
+    <div class="sheet-head"><h3>Choose Currency</h3><button class="icon-btn" onclick="closeSheet('sheet-currency')">✕</button></div>
+    <div class="sheet-body">
+      <div class="search-input" style="margin-bottom:8px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="var(--faint)" stroke-width="1.8"/><path d="M21 21l-4-4" stroke="var(--faint)" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <input id="currencySearch" placeholder="Search currency" oninput="renderCurrencyList()">
+      </div>
+      <div id="currencyList"></div>
+    </div>
+  </div>
+
+  <!-- Language picker -->
+  <div class="sheet" id="sheet-language">
+    <div class="sheet-drag"></div>
+    <div class="sheet-head"><h3>Choose Language</h3><button class="icon-btn" onclick="closeSheet('sheet-language')">✕</button></div>
+    <div class="sheet-body" id="languageList"></div>
+  </div>
+
+  <!-- success animation overlay -->
+  <div class="success-overlay" id="successOverlay">
+    <div class="check-circle"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4 10-10" stroke="var(--primary)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <h3 id="successTitle">Expense Saved</h3>
+    <p id="successSub">Added to your transactions</p>
+  </div>
+
+  <!-- toast -->
+  <div id="toast"></div>
+
+  <!-- confirm modal -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal-box">
+      <div class="mb-ico">🗑️</div>
+      <h3 id="confirmTitle">Delete this?</h3>
+      <p id="confirmBody">This action can't be undone.</p>
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closeConfirm()">Cancel</button>
+        <button class="btn btn-danger" id="confirmActionBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+  <!-- interstitial ad -->
+  <div class="ad-fullscreen" id="interstitialOverlay">
+    <div class="ad-fs-top">
+      <div class="ad-fs-label">Ad</div>
+      <div class="ad-fs-countdown" id="interstitialCountdown">5</div>
+      <button class="ad-fs-close" id="interstitialCloseBtn" onclick="closeInterstitial()">✕</button>
+    </div>
+    <div class="ad-fs-body">
+      <div class="ad-fs-art">🛒</div>
+      <h3>ShopEase — Big Billion Deals</h3>
+      <p>Up to 70% off electronics, fashion &amp; more. Download now and get an extra 10% off your first order.</p>
+      <button class="ad-fs-cta" onclick="toast('Opening advertiser page…')">Install Now</button>
+    </div>
+    <div class="ad-fs-foot">Ad · ShopEase</div>
+  </div>
+
+  <!-- rewarded ad -->
+  <div class="ad-fullscreen" id="rewardedOverlay">
+    <div class="ad-fs-top">
+      <div class="ad-fs-label">Ad · Rewarded</div>
+      <div class="ad-fs-countdown" id="rewardedCountdown">6</div>
+      <button class="ad-fs-close" id="rewardedCloseBtn" onclick="closeRewardedAd()">✕</button>
+    </div>
+    <div class="ad-fs-body" id="rewardedBodyPlaying">
+      <div class="ad-fs-art">🎬</div>
+      <h3>FinTrack Pro — Smarter Investing</h3>
+      <p>Watch this short ad to unlock Pro features free for 24 hours.</p>
+      <div class="ad-fs-progress"><div id="rewardedProgressBar"></div></div>
+    </div>
+    <div class="ad-fs-body ad-fs-reward" id="rewardedBodyDone">
+      <div class="reward-icon">🎉</div>
+      <h3>Reward Unlocked!</h3>
+      <p>Pro features — including no ads — are active on this device for the next 24 hours.</p>
+      <button class="ad-fs-cta" onclick="closeRewardedAd()">Continue</button>
+    </div>
+    <div class="ad-fs-foot">Ad · FinTrack Pro</div>
+  </div>
+
+</div>
+
+<script>
+/* ================= DATA MODEL ================= */
+const CATEGORIES = [
+  {id:'food', label:'Food', icon:'🍔', color:'#D8484A', bg:'#FBE7E7'},
+  {id:'groceries', label:'Groceries', icon:'🛒', color:'#0E6E52', bg:'#E1F2E8'},
+  {id:'transport', label:'Transport', icon:'🚗', color:'#3E63E0', bg:'#E7ECFC'},
+  {id:'shopping', label:'Shopping', icon:'🛍', color:'#8B6EF0', bg:'#EFE9FD'},
+  {id:'bills', label:'Bills', icon:'🧾', color:'#DA8A15', bg:'#FCEFD8'},
+  {id:'entertainment', label:'Entertainment', icon:'🎬', color:'#C2469A', bg:'#FBE6F3'},
+  {id:'health', label:'Health', icon:'💊', color:'#2AA9A0', bg:'#DFF5F3'},
+  {id:'education', label:'Education', icon:'📚', color:'#4E7BD8', bg:'#E5ECFB'},
+  {id:'travel', label:'Travel', icon:'✈️', color:'#DA8A15', bg:'#FCEFD8'},
+  {id:'other', label:'Other', icon:'📦', color:'#6E766F', bg:'#EEF0EC'},
+];
+const PAYMENTS = [
+  {id:'UPI', icon:'📱'}, {id:'Cash', icon:'💵'}, {id:'Debit Card', icon:'💳'},
+  {id:'Credit Card', icon:'💳'}, {id:'Bank Transfer', icon:'🏦'}, {id:'Wallet', icon:'👛'},
+];
+const INCOME_SOURCES = [
+  {id:'Salary', icon:'💼'}, {id:'Freelance', icon:'💻'}, {id:'Business', icon:'🏪'},
+  {id:'Interest', icon:'📈'}, {id:'Investment', icon:'💹'}, {id:'Rental', icon:'🏠'}, {id:'Other', icon:'✨'},
+];
+const GOAL_ICONS = ['💻','🎯','🏠','✈️','🚗','💍','🎓','🏥'];
+const INVEST_TYPES = [
+  {id:'sip', label:'SIP', icon:'🔁', color:'#3E63E0', bg:'#E7ECFC', nameLabel:'Fund name', hasSip:true},
+  {id:'mf', label:'Mutual Fund', icon:'📊', color:'#0E6E52', bg:'#E1F2E8', nameLabel:'Fund name', hasSip:false},
+  {id:'stock', label:'Stocks', icon:'📈', color:'#DA8A15', bg:'#FCEFD8', nameLabel:'Stock name / symbol', hasSip:false},
+  {id:'ppf', label:'PPF', icon:'🏦', color:'#8B6EF0', bg:'#EFE9FD', nameLabel:'Account name', hasSip:false},
+  {id:'fd', label:'Fixed Deposit', icon:'🔒', color:'#C2469A', bg:'#FBE6F3', nameLabel:'Bank / FD name', hasSip:false},
+];
+function investTypeInfo(id){ return INVEST_TYPES.find(x=>x.id===id) || INVEST_TYPES[1]; }
+
+function catInfo(id){ return CATEGORIES.find(c=>c.id===id) || CATEGORIES[9]; }
+const SUBCATEGORIES = {
+  food:['Restaurants','Fine Dining','Casual Dining','Fast Food','Food Court','Cafes','Coffee','Tea','Bakery','Pastries','Cakes','Desserts','Ice Cream','Sweets','Chocolates','Street Food','Snacks','Pizza','Burgers','Sandwiches','Biryani','Indian Food','North Indian','South Indian','Bengali Food','Chinese Food','Thai Food','Japanese Food','Korean Food','Mexican Food','Italian Food','Continental Food','Seafood','Vegetarian Food','Vegan Food','Meat Dishes','Chicken','Juice','Smoothies','Soft Drinks','Milkshakes','Food Delivery','Takeaway','Catering','Office Meals','School Meals','Breakfast','Lunch','Dinner','Late Night Food'],
+  groceries:['Fruits','Vegetables','Leafy Vegetables','Potatoes & Onions','Meat','Chicken','Fish','Seafood','Eggs','Milk','Cheese','Yogurt','Butter','Bread','Rice','Flour','Pasta','Noodles','Cereals','Oats','Pulses','Lentils','Beans','Spices','Salt','Sugar','Cooking Oil','Sauces','Pickles','Jam & Spreads','Snacks','Biscuits','Chocolates','Soft Drinks','Juice','Tea','Coffee','Frozen Food','Canned Food','Ready-to-Eat Food','Baby Food','Organic Food','Pet Food','Pet Supplies','Cleaning Supplies','Laundry Supplies','Kitchen Supplies','Paper Products','Personal Hygiene','Other Groceries'],
+  transport:['Petrol','Diesel','EV Charging','CNG','Fuel Additives','Bus','Train','Metro','Local Train','Taxi','Ride Sharing','Auto Rickshaw','E-Rickshaw','Airport Taxi','Car Rental','Bike Rental','Scooter Rental','Car Sharing','Parking','Toll','Highway Charges','Car Wash','Car Service','Bike Service','Car Maintenance','Bike Maintenance','Engine Repair','Tyres','Battery','Oil Change','Spare Parts','Car Accessories','Bike Accessories','Car Insurance','Bike Insurance','Vehicle Registration','Road Tax','Driving License','Driving Lessons','Traffic Fines','Roadside Assistance','Towing','Vehicle Inspection','Pollution Certificate','Parking Pass','Public Transport Pass','Travel Card','Bicycle Maintenance','Bicycle Rental','Other Transport'],
+  shopping:['Clothing','T-Shirts','Shirts','Pants','Jeans','Dresses','Jackets','Traditional Wear','Innerwear','Sleepwear','Shoes','Sandals','Sports Shoes','Bags','Wallets','Belts','Jewelry','Watches','Sunglasses','Accessories','Mobile Phones','Mobile Accessories','Laptops','Computers','Computer Accessories','Tablets','Headphones','Cameras','TVs','Home Appliances','Kitchen Appliances','Furniture','Home Decor','Bedding','Curtains','Lighting','Beauty Products','Cosmetics','Skincare','Haircare','Personal Care','Perfumes','Toys','Baby Products','Gifts','Books','Stationery','Sports Equipment','Online Shopping','Other Shopping'],
+  bills:['Electricity','Water','Gas','Internet','Broadband','Wi-Fi','Mobile Recharge','Mobile Bill','DTH','Cable TV','Streaming Subscription','Music Subscription','Software Subscription','Cloud Storage','Rent','Home Maintenance','Society Maintenance','Property Tax','Municipal Tax','Insurance','Life Insurance','Health Insurance','Car Insurance','Bike Insurance','Travel Insurance','Home Insurance','Credit Card Bill','Personal Loan','Home Loan','Car Loan','Bike Loan','Education Loan','EMI','BNPL Payment','Government Fees','License Fees','Registration Fees','School Fees','College Fees','Childcare Fees','Security Service','Domestic Help','Maid Service','Internet TV','Phone Service','Maintenance Charges','Parking Charges','Subscription Renewal','Late Fees','Other Bills'],
+  entertainment:['Movies','Movie Tickets','Netflix','Prime Video','Disney+','YouTube Premium','Other Streaming','Music Streaming','Spotify','Apple Music','YouTube Music','Podcasts','Concerts','Live Events','Theater','Comedy Shows','Sports Events','Cricket Matches','Football Matches','Theme Parks','Amusement Parks','Water Parks','Gaming','Mobile Games','PC Games','Console Games','Gaming Accessories','Gaming Subscriptions','Board Games','Card Games','Bowling','Go-Karting','Adventure Activities','Outdoor Activities','Nightclubs','Pubs & Lounges','Karaoke','Hobbies','Photography','Art','Crafts','Musical Instruments','Books','Magazines','Comics','Online Content','Events & Festivals','Party Expenses','Memberships','Other Entertainment'],
+  health:['General Doctor','Specialist Doctor','Hospital','Emergency Care','Pharmacy','Medicines','Prescription Medicines','OTC Medicines','Vitamins','Supplements','Dental','Dentist','Dental Cleaning','Dental Treatment','Eye Care','Eye Test','Glasses','Contact Lenses','Lab Tests','Blood Tests','Urine Tests','X-Ray','MRI','CT Scan','Ultrasound','Health Checkup','Vaccination','Physiotherapy','Chiropractic','Mental Wellness','Counseling','Therapy','Gym','Fitness Classes','Yoga','Meditation','Personal Trainer','Sports Therapy','Nutritionist','Dietitian','Medical Equipment','Medical Devices','Home Healthcare','Nursing','Ambulance','Health Insurance','Medical Insurance','Wellness Products','Personal Care','Other Health'],
+  education:['School Fees','College Fees','University Fees','Tuition','Private Tutor','Coaching','Entrance Coaching','Exam Preparation','Online Courses','Professional Courses','Certification','Diploma Courses','Degree Courses','Language Courses','Coding Courses','Skill Development','Workshops','Seminars','Exams','Exam Fees','Application Fees','Books','E-Books','Study Materials','Stationery','Notebooks','Pens & Pencils','School Supplies','College Supplies','Art Supplies','Computer Supplies','Laptop for Education','Educational Software','Learning Apps','Online Learning Subscription','School Uniform','College Uniform','School Shoes','School Transport','College Transport','Hostel Fees','Library Fees','Lab Fees','Project Expenses','Printing','Photocopy','Educational Events','Educational Travel','Student Memberships','Other Education'],
+  travel:['Flights','Domestic Flights','International Flights','Train Tickets','Bus Tickets','Metro Tickets','Taxi','Ride Sharing','Airport Transfer','Car Rental','Bike Rental','Scooter Rental','Hotels','Resorts','Hostels','Vacation Rental','Guest Houses','Homestays','Travel Insurance','Visa Fees','Passport Fees','Travel Documents','Tourist Attractions','Museums','Theme Parks','Tours','Guided Tours','Adventure Activities','Water Activities','Hiking','Camping','Beach Activities','Travel Food','Restaurants While Traveling','Hotel Dining','Snacks While Traveling','Travel Shopping','Souvenirs','Travel Clothing','Travel Gear','Luggage','Travel Accessories','Currency Exchange','Foreign Transaction Fees','Roaming','Travel SIM','Airport Lounge','Parking','Road Tolls','Other Travel'],
+};
+function fmtINR(n){
+  n = Math.round(n);
+  const neg = n<0; n = Math.abs(n);
+  let s = n.toString();
+  let last3 = s.length>3 ? s.slice(-3) : s;
+  let rest = s.length>3 ? s.slice(0,-3) : '';
+  if(rest !== '') last3 = ',' + last3;
+  rest = rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',');
+  return (neg?'-':'') + '₹' + rest + last3;
+}
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function fmtDate(iso){
+  const d = new Date(iso+'T00:00:00');
+  return d.toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric'});
+}
+
+const DEFAULT_STATE = {
+  user:{name:'Avijit', income:60000, budget:40000, currency:'INR', language:'English', onboarded:false, theme:'light', isPro:false, proTrialUntil:null},
+  transactions:[
+    {id:'t1', type:'expense', amount:450, category:'food', payment:'UPI', merchant:'Swiggy', date:todayISO(), note:'', time:'8:42 PM'},
+    {id:'t2', type:'expense', amount:280, category:'transport', payment:'UPI', merchant:'Uber', date:todayISO(), note:'', time:'6:15 PM'},
+    {id:'t3', type:'expense', amount:1299, category:'shopping', payment:'Credit Card', merchant:'Amazon', date:offsetDate(-1), note:'', time:'11:20 AM'},
+    {id:'t4', type:'expense', amount:780, category:'groceries', payment:'UPI', merchant:'Blinkit', date:offsetDate(-1), note:'', time:'4:05 PM'},
+    {id:'t5', type:'expense', amount:649, category:'entertainment', payment:'Credit Card', merchant:'Netflix', date:offsetDate(-3), note:'Monthly subscription', time:'12:00 AM'},
+    {id:'t6', type:'expense', amount:1840, category:'bills', payment:'Bank Transfer', merchant:'Electricity Board', date:offsetDate(-4), note:'', time:'9:00 AM'},
+    {id:'t7', type:'expense', amount:12000, category:'bills', payment:'Bank Transfer', merchant:'Rent', date:offsetDate(-6), note:'', time:'9:00 AM'},
+    {id:'t8', type:'expense', amount:699, category:'bills', payment:'UPI', merchant:'Airtel Mobile', date:offsetDate(-8), note:'', time:'2:30 PM'},
+    {id:'t9', type:'income', amount:60000, category:'Salary', payment:'Bank Transfer', merchant:'Salary Credit', date:offsetDate(-10), note:'', time:'10:00 AM'},
+    {id:'t10', type:'expense', amount:520, category:'food', payment:'Cash', merchant:'Local Diner', date:offsetDate(-2), note:'', time:'1:15 PM'},
+  ],
+  budgets:[
+    {id:'b1', name:'Food budget', category:'food', limit:5000},
+    {id:'b2', name:'Transport budget', category:'transport', limit:4000},
+    {id:'b3', name:'Shopping budget', category:'shopping', limit:3000},
+    {id:'b4', name:'Bills budget', category:'bills', limit:16000},
+  ],
+  recurring:[
+    {id:'r1', name:'Netflix', amount:649, category:'entertainment', frequency:'Monthly', nextDate:'2026-08-20', payment:'Credit Card', reminder:3},
+    {id:'r2', name:'Internet', amount:999, category:'bills', frequency:'Monthly', nextDate:'2026-08-22', payment:'UPI', reminder:3},
+    {id:'r3', name:'Rent', amount:12000, category:'bills', frequency:'Monthly', nextDate:'2026-09-01', payment:'Bank Transfer', reminder:7},
+  ],
+  goals:[
+    {id:'g1', name:'New Laptop', target:80000, current:32000, date:'2026-12-01', icon:'💻'},
+    {id:'g2', name:'Emergency Fund', target:100000, current:25000, date:'2027-03-01', icon:'🎯'},
+  ],
+  cards:[
+    {id:'c1', name:'HDFC Credit Card', bank:'HDFC Bank', limit:100000, spent:18450, statementDate:'2026-08-05', dueDate:'2026-08-22', bill:15620},
+  ],
+  investments:[
+    {id:'i1', type:'sip', name:'Axis Bluechip Fund', invested:48000, current:54260},
+    {id:'i2', type:'mf', name:'Parag Parikh Flexi Cap', invested:25000, current:29840},
+    {id:'i3', type:'stock', name:'TCS', invested:18000, current:19540},
+    {id:'i4', type:'stock', name:'HDFC Bank', invested:15000, current:14120},
+    {id:'i5', type:'ppf', name:'PPF Account', invested:60000, current:65400},
+    {id:'i6', type:'fd', name:'HDFC Fixed Deposit', invested:50000, current:52650},
+  ],
+  notifications:[
+    {id:'n1', type:'budget', icon:'🔔', title:'Budget Alert', body:'You have used 85% of your Food budget.', read:false},
+    {id:'n2', type:'payment', icon:'💳', title:'Payment Reminder', body:'Your credit card payment is due tomorrow.', read:false},
+    {id:'n3', type:'insight', icon:'💡', title:'Spending Insight', body:'You spent less this week.', read:true},
+    {id:'n4', type:'goal', icon:'🎯', title:'Savings Goal', body:"You're 40% closer to your laptop goal.", read:true},
+  ],
+};
+function offsetDate(days){ const d = new Date(); d.setDate(d.getDate()+days); return d.toISOString().slice(0,10); }
+
+let state = loadState();
+if(!state.investments) state.investments = JSON.parse(JSON.stringify(DEFAULT_STATE.investments));
+if(!state.user.theme) state.user.theme = 'light';
+if(state.user.isPro===undefined) state.user.isPro = false;
+if(state.user.proTrialUntil===undefined) state.user.proTrialUntil = null;
+document.getElementById('device').setAttribute('data-theme', state.user.theme);
+function loadState(){
+  try{
+    const raw = localStorage.getItem('set_state_v1');
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return JSON.parse(JSON.stringify(DEFAULT_STATE));
+}
+function saveState(){ localStorage.setItem('set_state_v1', JSON.stringify(state)); }
+
+/* ================= NAV: SCREENS ================= */
+let screenStack = ['screen-splash'];
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  screenStack.push(id);
+}
+function backToMain(){ showScreen('screen-main'); }
+
+/* ================= SPLASH -> ONBOARD ================= */
+/* Prototype note: onboarding is always shown after splash so reviewers can always see the
+   flow (a real production app would gate this on state.user.onboarded). */
+setTimeout(()=>{ showScreen('screen-onboard'); obGoTo(0); }, 1900);
+
+/* ================= ONBOARDING ================= */
+const OB_LAST = 3;
+let obIndex = 0;
+function obGoTo(i){
+  obIndex = Math.max(0, Math.min(OB_LAST, i));
+  document.getElementById('obTrack').style.transform = `translateX(-${obIndex*25}%)`;
+  document.querySelectorAll('.ob-seg').forEach((seg,idx)=>{
+    seg.classList.toggle('done', idx<obIndex);
+    seg.classList.toggle('active', idx===obIndex);
+  });
+  document.getElementById('obNextBtn').textContent = obIndex===OB_LAST ? 'Get Started' : 'Next';
+}
+function obNext(){
+  if(obIndex>=OB_LAST){ goSetup(); return; }
+  obGoTo(obIndex+1);
+}
+/* swipe support */
+(function(){
+  const track = document.getElementById('obTrack');
+  let startX = 0, startY = 0, dragging = false;
+  track.addEventListener('touchstart', e=>{
+    startX = e.touches[0].clientX; startY = e.touches[0].clientY; dragging = true;
+  }, {passive:true});
+  track.addEventListener('touchend', e=>{
+    if(!dragging) return; dragging = false;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if(Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)){
+      if(dx < 0 && obIndex < OB_LAST) obGoTo(obIndex+1);
+      else if(dx > 0 && obIndex > 0) obGoTo(obIndex-1);
+    }
+  }, {passive:true});
+})();
+function goSetup(){ showScreen('screen-setup'); }
+
+/* chip select for setup language */
+document.querySelectorAll('#screen-setup .chip[data-lang]').forEach(c=>{
+  c.addEventListener('click', ()=>{
+    document.querySelectorAll('#screen-setup .chip[data-lang]').forEach(x=>x.classList.remove('selected'));
+    c.classList.add('selected');
+  });
+});
+function finishSetup(){
+  const name = document.getElementById('setupName').value.trim();
+  const income = parseFloat(document.getElementById('setupIncome').value);
+  const budget = parseFloat(document.getElementById('setupBudget').value);
+  if(name) state.user.name = name;
+  if(!isNaN(income) && income>0) state.user.income = income;
+  if(!isNaN(budget) && budget>0) state.user.budget = budget;
+  state.user.onboarded = true;
+  saveState();
+  enterApp();
+}
+
+/* ================= ENTER APP ================= */
+function enterApp(){
+  showScreen('screen-main');
+  buildPickers();
+  showHomeSkeleton();
+  setTimeout(refreshAll, 420);
+  initTheme();
+  checkProTrialExpiry();
+  applyAdsVisibility();
+}
+
+/* ================= SKELETON LOADING ================= */
+function skelBlock(w,h,radius){ return `<div class="skel" style="width:${w}; height:${h}px; border-radius:${radius||14}px; flex-shrink:0;"></div>`; }
+function showHomeSkeleton(){
+  document.getElementById('homeTxnList').innerHTML = Array.from({length:3}).map(()=>`<div class="skel-row">${skelBlock('100%',48,12)}</div>`).join('');
+  document.getElementById('homeCatScroll').innerHTML = Array.from({length:5}).map(()=>skelBlock('104px',96,14)).join('');
+}
+function showTxnSkeleton(){
+  document.getElementById('txnListWrap').innerHTML = `<div style="padding:14px 20px;">`+Array.from({length:6}).map(()=>`<div style="margin-bottom:10px;">${skelBlock('100%',60,14)}</div>`).join('')+`</div>`;
+}
+function showInvestSkeleton(){
+  document.getElementById('holdingsList').innerHTML = Array.from({length:4}).map(()=>`<div class="skel-row">${skelBlock('100%',64,14)}</div>`).join('');
+}
+
+/* ================= TABS ================= */
+function showTab(tab, el){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>{
+    const isActive = n.dataset.tab===tab;
+    n.classList.toggle('active', isActive);
+  });
+  if(el){
+    el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
+  }
+  document.getElementById('mainScroll').scrollTo({top:0, behavior:'instant'});
+  if(tab==='transactions'){ showTxnSkeleton(); setTimeout(renderTransactions, 320); }
+  if(tab==='invest'){ showInvestSkeleton(); setTimeout(renderInvest, 320); }
+  if(tab==='profile') renderProfile();
+}
+
+/* ================= REFRESH / COMPUTE ================= */
+function computeTotals(){
+  const income = state.transactions.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+  const expense = state.transactions.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+  return {income, expense, balance: income-expense};
+}
+function categorySpend(catId){
+  return state.transactions.filter(t=>t.type==='expense' && t.category===catId).reduce((s,t)=>s+t.amount,0);
+}
+function monthName(){
+  return new Date().toLocaleDateString('en-IN',{month:'long'});
+}
+
+function refreshAll(){
+  renderHome();
+  renderBudgetScreen();
+  renderTransactions();
+  renderProfile();
+  renderNotifications();
+  renderInvest();
+  updateNotifDot();
+}
+
+/* ---- HOME ---- */
+function renderHome(){
+  document.getElementById('greetName').textContent = greeting() + ', ' + (state.user.name||'there') + ' 👋';
+  document.getElementById('greetDate').textContent = new Date().toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'long'});
+
+  const t = computeTotals();
+  animateCount(document.getElementById('homeBalance'), t.balance);
+  document.getElementById('homeIncome').textContent = fmtINR(t.income);
+  document.getElementById('homeExpense').textContent = fmtINR(t.expense);
+
+  document.getElementById('homeBudgetTitle').textContent = monthName() + ' Budget';
+  const budgetTotal = state.user.budget || 40000;
+  const spent = t.expense;
+  const pct = Math.min(100, Math.round((spent/budgetTotal)*100));
+  document.getElementById('homeBudgetSpent').textContent = fmtINR(spent);
+  document.getElementById('homeBudgetTotal').textContent = fmtINR(budgetTotal);
+  const bar = document.getElementById('homeBudgetBar');
+  bar.querySelector('div').style.width = pct+'%';
+  bar.className = 'progress' + (pct>=100?' over':pct>=80?' warn':'');
+  document.getElementById('homeBudgetRemain').textContent = fmtINR(Math.max(0,budgetTotal-spent)) + ' remaining';
+
+  // spending overview categories (top 4 by spend, or defaults)
+  const catScroll = document.getElementById('homeCatScroll');
+  const sorted = CATEGORIES.map(c=>({...c, spend:categorySpend(c.id)})).filter(c=>c.spend>0).sort((a,b)=>b.spend-a.spend).slice(0,6);
+  const show = sorted.length ? sorted : CATEGORIES.slice(0,4).map(c=>({...c, spend:0}));
+  catScroll.innerHTML = show.map((c,i)=>`
+    <div class="cat-card stagger-in" style="animation-delay:${i*45}ms;" onclick="showTab('transactions')">
+      <div class="cc-ico" style="background:${c.bg}; color:${c.color};">${c.icon}</div>
+      <b>${c.label}</b>
+      <span class="num">${fmtINR(c.spend)}</span>
+    </div>`).join('');
+
+  // recent transactions
+  const recent = [...state.transactions].sort((a,b)=> (b.date+b.time).localeCompare(a.date+a.time) || b.id.localeCompare(a.id)).slice(0,4);
+  document.getElementById('homeTxnList').innerHTML = recent.length ? recent.map((t,i)=>txnRowHTML(t,i)).join('') : emptyInlineHTML();
+
+  const insights = generateInsights();
+  document.getElementById('homeInsightText').textContent = insights.food;
+}
+function greeting(){
+  const h = new Date().getHours();
+  if(h<12) return 'Good morning'; if(h<17) return 'Good afternoon'; return 'Good evening';
+}
+function emptyInlineHTML(){
+  return `<div style="padding:26px 20px; text-align:center; color:var(--muted); font-size:13.5px; font-weight:600;">No transactions yet — tap + to add one.</div>`;
+}
+function txnRowHTML(t, i){
+  const delay = (typeof i === 'number') ? ` style="animation-delay:${i*40}ms;"` : '';
+  const cls = (typeof i === 'number') ? ' stagger-in' : '';
+  if(t.type==='income'){
+    return `<div class="txn-row${cls}"${delay} onclick="openTxnDetail('${t.id}')">
+      <div class="txn-ico" style="background:var(--primary-light); color:var(--primary);">↓</div>
+      <div class="txn-mid"><b>${t.merchant}</b><span>${t.category} • ${t.payment}</span></div>
+      <div class="txn-amt pos num">+${fmtINR(t.amount)}</div>
+    </div>`;
+  }
+  const c = catInfo(t.category);
+  const catLine = t.subcategory ? `${t.subcategory} • ${t.payment}` : `${c.label} • ${t.payment}`;
+  return `<div class="txn-row${cls}"${delay} onclick="openTxnDetail('${t.id}')">
+      <div class="txn-ico" style="background:${c.bg}; color:${c.color};">${c.icon}</div>
+      <div class="txn-mid"><b>${t.merchant}</b><span>${catLine}</span></div>
+      <div class="txn-amt neg num">-${fmtINR(t.amount)}</div>
+    </div>`;
+}
+function animateCount(el, target){
+  const start = 0; const dur = 700; const t0 = performance.now();
+  function step(now){
+    const p = Math.min(1, (now-t0)/dur);
+    const eased = 1-Math.pow(1-p,3);
+    el.textContent = fmtINR(start + (target-start)*eased);
+    if(p<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+/* ---- TRANSACTIONS ---- */
+let activeFilters = {dateRange:'all', type:'all', category:null, payment:null, min:null, max:null};
+function renderTransactions(){
+  const q = (document.getElementById('txnSearch').value||'').toLowerCase();
+  let list = [...state.transactions];
+
+  if(activeFilters.type!=='all') list = list.filter(t=>t.type===activeFilters.type);
+  if(activeFilters.category) list = list.filter(t=>t.category===activeFilters.category);
+  if(activeFilters.payment) list = list.filter(t=>t.payment===activeFilters.payment);
+  if(activeFilters.min) list = list.filter(t=>t.amount>=activeFilters.min);
+  if(activeFilters.max) list = list.filter(t=>t.amount<=activeFilters.max);
+  if(activeFilters.dateRange!=='all'){
+    const now = new Date();
+    list = list.filter(t=>{
+      const d = new Date(t.date+'T00:00:00');
+      if(activeFilters.dateRange==='today') return t.date===todayISO();
+      if(activeFilters.dateRange==='week'){ const diff=(now-d)/86400000; return diff<7 && diff>=0; }
+      if(activeFilters.dateRange==='month') return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear();
+      return true;
+    });
+  }
+  if(q) list = list.filter(t=> t.merchant.toLowerCase().includes(q) || String(t.category).toLowerCase().includes(q));
+
+  list.sort((a,b)=> (b.date+b.time).localeCompare(a.date+a.time));
+
+  const wrap = document.getElementById('txnListWrap');
+  document.getElementById('txnFilterBtn').classList.toggle('on', JSON.stringify(activeFilters)!==JSON.stringify({dateRange:'all', type:'all', category:null, payment:null, min:null, max:null}));
+
+  if(!list.length){
+    wrap.innerHTML = `<div class="empty-state"><div class="es-ico">🔍</div><h4>Nothing here yet</h4><p>Start tracking your first expense.</p><button class="btn btn-primary btn-sm" onclick="openSheet('sheet-add-type')">Add Expense</button></div>`;
+    return;
+  }
+
+  const groups = {'Today':[], 'Yesterday':[], 'This Week':[], 'Earlier':[]};
+  const today = todayISO(); const yest = offsetDate(-1);
+  const now = new Date();
+  list.forEach(t=>{
+    if(t.date===today) groups['Today'].push(t);
+    else if(t.date===yest) groups['Yesterday'].push(t);
+    else if((now - new Date(t.date+'T00:00:00'))/86400000 < 7) groups['This Week'].push(t);
+    else groups['Earlier'].push(t);
+  });
+  let html = '';
+  let gi = 0;
+  let groupsShown = 0;
+  Object.keys(groups).forEach(k=>{
+    if(!groups[k].length) return;
+    html += `<div class="date-group-label">${k}</div><div class="card txn-list-card" style="margin:0 20px 4px;">${groups[k].map(t=>{ const row = txnRowHTML(t, gi); gi++; return row; }).join('')}</div>`;
+    groupsShown++;
+    if(groupsShown===1 && adsEnabled()){
+      html += nativeAdCardHTML('💳', 'var(--amber-light)', 'Track spends with SmartPay UPI', 'Sponsored · Zero fees, instant cashback');
+    }
+  });
+  wrap.innerHTML = html;
+}
+
+/* filter sheet interactions */
+function buildFilterChoices(){
+  const catWrap = document.getElementById('filterCategory');
+  catWrap.innerHTML = `<div class="chip selected" data-v="">All</div>` + CATEGORIES.map(c=>`<div class="chip" data-v="${c.id}">${c.icon} ${c.label}</div>`).join('');
+  const payWrap = document.getElementById('filterPayment');
+  payWrap.innerHTML = `<div class="chip selected" data-v="">All</div>` + PAYMENTS.map(p=>`<div class="chip" data-v="${p.id}">${p.icon} ${p.id}</div>`).join('');
+  [catWrap, payWrap].forEach(wrap=>{
+    wrap.addEventListener('click', e=>{
+      const chip = e.target.closest('.chip'); if(!chip) return;
+      wrap.querySelectorAll('.chip').forEach(c=>c.classList.remove('selected'));
+      chip.classList.add('selected');
+    });
+  });
+  ['filterDateRange','filterType'].forEach(id=>{
+    const wrap = document.getElementById(id);
+    wrap.addEventListener('click', e=>{
+      const chip = e.target.closest('.chip'); if(!chip) return;
+      wrap.querySelectorAll('.chip').forEach(c=>c.classList.remove('selected'));
+      chip.classList.add('selected');
+    });
+  });
+}
+function applyFilters(){
+  activeFilters.dateRange = document.querySelector('#filterDateRange .chip.selected').dataset.v;
+  activeFilters.type = document.querySelector('#filterType .chip.selected').dataset.v;
+  activeFilters.category = document.querySelector('#filterCategory .chip.selected').dataset.v || null;
+  activeFilters.payment = document.querySelector('#filterPayment .chip.selected').dataset.v || null;
+  activeFilters.min = parseFloat(document.getElementById('filterMin').value) || null;
+  activeFilters.max = parseFloat(document.getElementById('filterMax').value) || null;
+  closeSheet('sheet-filter');
+  renderTransactions();
+  toast('Filters applied');
+}
+function resetFilters(){
+  activeFilters = {dateRange:'all', type:'all', category:null, payment:null, min:null, max:null};
+  document.querySelectorAll('#sheet-filter .chip').forEach(c=>c.classList.remove('selected'));
+  document.querySelector('#filterDateRange .chip[data-v="all"]').classList.add('selected');
+  document.querySelector('#filterType .chip[data-v="all"]').classList.add('selected');
+  document.querySelector('#filterCategory .chip[data-v=""]').classList.add('selected');
+  document.querySelector('#filterPayment .chip[data-v=""]').classList.add('selected');
+  document.getElementById('filterMin').value=''; document.getElementById('filterMax').value='';
+  renderTransactions();
+}
+
+/* ---- TRANSACTION DETAIL ---- */
+let currentDetailId = null;
+function openTxnDetail(id){
+  currentDetailId = id;
+  const t = state.transactions.find(x=>x.id===id);
+  if(!t) return;
+  const isExp = t.type==='expense';
+  const c = isExp ? catInfo(t.category) : {icon:'↓', color:'var(--primary)', bg:'var(--primary-light)', label:t.category};
+  document.getElementById('txnDetailBody').innerHTML = `
+    <div class="detail-hero">
+      <div class="detail-ico" style="background:${c.bg}; color:${c.color};">${c.icon}</div>
+      <div class="detail-amt num" style="color:${isExp?'var(--ink)':'var(--green)'};">${isExp?'-':'+'}${fmtINR(t.amount)}</div>
+      <div class="detail-merchant">${t.merchant}</div>
+    </div>
+    <div class="detail-list card">
+      <div class="detail-row"><span>Category</span><span>${isExp? c.icon+' '+c.label : t.category}</span></div>
+      ${isExp && t.subcategory ? `<div class="detail-row"><span>Subcategory</span><span>${t.subcategory}</span></div>` : ''}
+      <div class="detail-row"><span>Date</span><span>${fmtDate(t.date)}</span></div>
+      <div class="detail-row"><span>Time</span><span>${t.time||'—'}</span></div>
+      <div class="detail-row"><span>Payment method</span><span>${t.payment}</span></div>
+      <div class="detail-row"><span>Notes</span><span>${t.note||'—'}</span></div>
+      <div class="detail-row"><span>Receipt</span><span>${t.receipt?'Attached':'None'}</span></div>
+    </div>
+    <div class="detail-actions">
+      <button class="btn btn-outline" onclick="toast('Edit form would open here')">Edit</button>
+      <button class="btn btn-danger" onclick="confirmDeleteTxn()">Delete</button>
+    </div>`;
+  showScreen('screen-txndetail');
+}
+function confirmDeleteTxn(){
+  showConfirm('Delete transaction?', "This can't be undone.", ()=>{
+    state.transactions = state.transactions.filter(t=>t.id!==currentDetailId);
+    saveState(); refreshAll();
+    closeConfirm();
+    showScreen('screen-main'); showTab('transactions');
+    toast('Transaction deleted');
+  });
+}
+
+/* ---- BUDGET SCREEN ---- */
+function renderBudgetScreen(){
+  const t = computeTotals();
+  const budgetTotal = state.user.budget || 40000;
+  const spent = t.expense;
+  const pct = Math.min(100, Math.round((spent/budgetTotal)*100));
+  document.getElementById('budgetHeadTitle').textContent = monthName()+' Budget';
+  document.getElementById('budgetSpentTop').textContent = fmtINR(spent);
+  document.getElementById('budgetPercent').textContent = pct+'%';
+  const bar = document.getElementById('budgetTopBar');
+  bar.querySelector('div').style.width = pct+'%';
+  bar.className = 'progress'+(pct>=100?' over':pct>=80?' warn':'');
+  document.getElementById('budgetRemainTop').textContent = fmtINR(Math.max(0,budgetTotal-spent))+' left';
+
+  const listCard = document.getElementById('budgetListCard');
+  if(!state.budgets.length){
+    listCard.innerHTML = `<div class="empty-state"><div class="es-ico">🎯</div><h4>Set a budget and stay in control</h4><p>Create category budgets to track overspending.</p></div>`;
+    return;
+  }
+  listCard.innerHTML = state.budgets.map(b=>{
+    const c = catInfo(b.category);
+    const s = categorySpend(b.category);
+    const p = Math.min(100, Math.round((s/b.limit)*100));
+    const over = s > b.limit;
+    return `<div class="budget-item">
+      <div class="bi-top"><b>${c.icon} ${c.label}</b><span class="bi-nums num">${fmtINR(s)} / ${fmtINR(b.limit)}</span></div>
+      <div class="progress ${over?'over':p>=80?'warn':''}"><div style="width:${p}%"></div></div>
+      ${over?`<div class="over-flag">⚠ Over budget</div>`:''}
+    </div>`;
+  }).join('');
+}
+function buildCbCategoryGrid(targetId){
+  const grid = document.getElementById(targetId);
+  grid.innerHTML = CATEGORIES.map((c,i)=>`<div class="pick-tile ${i===0?'selected':''}" data-cat="${c.id}">
+      <div class="pt-ico" style="background:${c.bg}; color:${c.color};">${c.icon}</div><span>${c.label}</span>
+    </div>`).join('');
+  grid.addEventListener('click', e=>{
+    const tile = e.target.closest('.pick-tile'); if(!tile) return;
+    grid.querySelectorAll('.pick-tile').forEach(t=>t.classList.remove('selected'));
+    tile.classList.add('selected');
+  });
+}
+function openCreateBudget(){
+  document.getElementById('cbName').value='';
+  document.getElementById('cbLimit').value='';
+  document.getElementById('cbStart').value = todayISO();
+  openSheet('sheet-create-budget');
+}
+function createBudget(){
+  const name = document.getElementById('cbName').value.trim();
+  const limit = parseFloat(document.getElementById('cbLimit').value);
+  const catTile = document.querySelector('#cbCategoryGrid .pick-tile.selected');
+  if(!name || !limit || limit<=0){ toast('Please fill in a name and limit'); return; }
+  state.budgets.push({id:'b'+Date.now(), name, category:catTile.dataset.cat, limit});
+  saveState();
+  closeSheet('sheet-create-budget');
+  renderBudgetScreen();
+  showSuccess('Budget Created', name+' is now being tracked');
+}
+
+/* ---- RECURRING ---- */
+function renderRecurring(){
+  const wrap = document.getElementById('recurringList');
+  if(!state.recurring.length){
+    wrap.innerHTML = `<div class="empty-state"><div class="es-ico">🔁</div><h4>No recurring payments</h4><p>Track subscriptions and bills that repeat.</p></div>`;
+    return;
+  }
+  wrap.innerHTML = state.recurring.map(r=>{
+    const c = catInfo(r.category);
+    return `<div class="list-card-item">
+      <div class="lci-ico" style="background:${c.bg}; color:${c.color};">${c.icon}</div>
+      <div class="lci-mid"><b>${r.name}</b><span>${r.frequency} • ${r.payment}</span></div>
+      <div class="lci-right num">${fmtINR(r.amount)}<small>Next: ${fmtDate(r.nextDate)}</small></div>
+    </div>`;
+  }).join('');
+}
+function buildRpCategoryGrid(){ buildCbCategoryGrid('rpCategoryGrid'); }
+function saveRecurring(){
+  const name = document.getElementById('rpName').value.trim();
+  const amount = parseFloat(document.getElementById('rpAmount').value);
+  const cat = document.querySelector('#rpCategoryGrid .pick-tile.selected').dataset.cat;
+  const freq = document.querySelector('#rpFrequency .chip.selected').dataset.v;
+  const date = document.getElementById('rpDate').value || todayISO();
+  const pay = document.querySelector('#rpPayment .chip.selected').dataset.v;
+  const rem = document.querySelector('#rpReminder .chip.selected').dataset.v;
+  if(!name || !amount || amount<=0){ toast('Please fill in name and amount'); return; }
+  state.recurring.push({id:'r'+Date.now(), name, amount, category:cat, frequency:freq, nextDate:date, payment:pay, reminder:parseInt(rem)});
+  saveState();
+  closeSheet('sheet-add-recurring');
+  renderRecurring();
+  showSuccess('Payment Saved', name+" will remind you before it's due");
+}
+
+/* ---- SAVINGS GOALS ---- */
+function renderGoals(){
+  const wrap = document.getElementById('goalsList');
+  if(!state.goals.length){
+    wrap.innerHTML = `<div class="empty-state"><div class="es-ico">🎯</div><h4>Start your first savings goal</h4><p>Set a target and watch your progress grow.</p></div>`;
+    return;
+  }
+  wrap.innerHTML = state.goals.map(g=>{
+    const pct = Math.min(100, Math.round((g.current/g.target)*100));
+    return `<div class="goal-item">
+      <div class="gi-top"><div class="gi-ico">${g.icon}</div><div><b>${g.name}</b><span>Target: ${new Date(g.date+'T00:00:00').toLocaleDateString('en-IN',{month:'long', year:'numeric'})}</span></div></div>
+      <div class="gi-nums"><span class="num">${fmtINR(g.current)} / ${fmtINR(g.target)}</span><b>${pct}%</b></div>
+      <div class="progress"><div style="width:${pct}%"></div></div>
+    </div>`;
+  }).join('');
+}
+function buildGlIconGrid(){
+  const grid = document.getElementById('glIconGrid');
+  grid.innerHTML = GOAL_ICONS.map((ic,i)=>`<div class="pick-tile ${i===0?'selected':''}" data-icon="${ic}"><div class="pt-ico" style="background:var(--purple-light); color:var(--purple);">${ic}</div></div>`).join('');
+  grid.addEventListener('click', e=>{
+    const tile = e.target.closest('.pick-tile'); if(!tile) return;
+    grid.querySelectorAll('.pick-tile').forEach(t=>t.classList.remove('selected'));
+    tile.classList.add('selected');
+  });
+}
+function createGoal(){
+  const name = document.getElementById('glName').value.trim();
+  const target = parseFloat(document.getElementById('glTarget').value);
+  const current = parseFloat(document.getElementById('glCurrent').value) || 0;
+  const date = document.getElementById('glDate').value || offsetDate(180);
+  const icon = document.querySelector('#glIconGrid .pick-tile.selected').dataset.icon;
+  if(!name || !target || target<=0){ toast('Please fill in a name and target amount'); return; }
+  state.goals.push({id:'g'+Date.now(), name, target, current, date, icon});
+  saveState();
+  closeSheet('sheet-add-goal');
+  renderGoals();
+  showSuccess('Goal Created', name+' is ready to track');
+}
+
+/* ---- CREDIT CARDS ---- */
+function renderCards(){
+  const wrap = document.getElementById('cardsList');
+  if(!state.cards.length){
+    wrap.innerHTML = `<div class="empty-state"><div class="es-ico">💳</div><h4>No cards yet</h4><p>Add a credit card to track spending and due dates.</p></div>`;
+    return;
+  }
+  wrap.innerHTML = state.cards.map(c=>{
+    const pct = Math.min(100, Math.round((c.spent/c.limit)*100));
+    return `<div class="cc-visual">
+      <div class="cv-bank">${c.name}</div>
+      <div class="cv-spent num">${fmtINR(c.spent)} spent</div>
+      <div class="cv-limit num">Limit ${fmtINR(c.limit)} · ${pct}% used</div>
+      <div class="cv-bar"><div style="width:${pct}%"></div></div>
+      <div class="cv-foot">
+        <div><small>DUE</small>${fmtDate(c.dueDate)}</div>
+        <div><small>BILL</small><span class="num">${fmtINR(c.bill)}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function saveCard(){
+  const name = document.getElementById('ccName').value.trim();
+  const bank = document.getElementById('ccBank').value.trim();
+  const limit = parseFloat(document.getElementById('ccLimit').value);
+  const statement = document.getElementById('ccStatement').value || todayISO();
+  const due = document.getElementById('ccDue').value || offsetDate(20);
+  const bill = parseFloat(document.getElementById('ccBill').value) || 0;
+  if(!name || !limit){ toast('Please fill in card name and limit'); return; }
+  state.cards.push({id:'c'+Date.now(), name, bank, limit, spent:bill, statementDate:statement, dueDate:due, bill});
+  saveState();
+  closeSheet('sheet-add-card');
+  renderCards();
+  showSuccess('Card Added', name+' is now being tracked');
+}
+
+/* ---- INVESTMENTS ---- */
+let investFilter = 'all';
+function renderInvest(){
+  if(!state.investments) state.investments = [];
+  const invested = state.investments.reduce((s,i)=>s+i.invested,0);
+  const current = state.investments.reduce((s,i)=>s+i.current,0);
+  const gain = current - invested;
+  document.getElementById('investTotal').textContent = fmtINR(current);
+  document.getElementById('investPrincipal').textContent = fmtINR(invested);
+  const gainEl = document.getElementById('investGain');
+  gainEl.textContent = (gain>=0?'+':'-') + fmtINR(Math.abs(gain));
+  gainEl.className = 'ihv num ' + (gain>=0?'gain':'loss');
+
+  const typeScroll = document.getElementById('investTypeScroll');
+  const chips = [{id:'all', label:'All', icon:'✨'}, ...INVEST_TYPES];
+  typeScroll.innerHTML = chips.map(t=>`<div class="chip ${investFilter===t.id?'selected':''}" onclick="setInvestFilter('${t.id}')">${t.icon||''} ${t.label}</div>`).join('');
+
+  const list = state.investments.filter(i=> investFilter==='all' || i.type===investFilter);
+  const wrap = document.getElementById('holdingsList');
+  if(!list.length){
+    wrap.innerHTML = `<div class="empty-state"><div class="es-ico">📈</div><h4>No holdings yet</h4><p>Add a mutual fund, SIP, stock, PPF or FD to start tracking.</p></div>`;
+    return;
+  }
+  wrap.innerHTML = list.map((i,idx)=>{
+    const t = investTypeInfo(i.type);
+    const g = i.current - i.invested;
+    const pct = i.invested ? Math.round((g/i.invested)*100) : 0;
+    const row = `<div class="list-card-item stagger-in" style="animation-delay:${idx*45}ms;" onclick="toast('${i.name.replace(/'/g,"")} · ${t.label}')">
+      <div class="lci-ico" style="background:${t.bg}; color:${t.color};">${t.icon}</div>
+      <div class="lci-mid"><b>${i.name}</b><span>${t.label} · Invested ${fmtINR(i.invested)}</span></div>
+      <div class="lci-right num">${fmtINR(i.current)}<small style="color:${g>=0?'var(--green)':'var(--red)'};">${g>=0?'+':''}${pct}%</small></div>
+    </div>`;
+    const adAfter = (idx===Math.min(1,list.length-1) && adsEnabled()) ? nativeAdRowHTML('🏦','var(--purple-light)','7.5% p.a. Fixed Deposits','Sponsored · FinBank · Limited period offer','View') : '';
+    return row + adAfter;
+  }).join('');
+}
+function setInvestFilter(id){ investFilter = id; renderInvest(); }
+function saveInvestment(){
+  const name = document.getElementById('invName').value.trim();
+  const invested = parseFloat(document.getElementById('invInvested').value);
+  const current = parseFloat(document.getElementById('invCurrent').value) || invested;
+  if(!name || !invested || invested<=0){ toast('Please fill in a name and invested amount'); return; }
+  state.investments.push({id:'i'+Date.now(), type:invSelectedType, name, invested, current});
+  saveState();
+  closeSheet('sheet-add-investment');
+  document.getElementById('invName').value=''; document.getElementById('invInvested').value=''; document.getElementById('invCurrent').value=''; document.getElementById('invSipAmount').value='';
+  renderInvest();
+  showSuccess('Investment Added', name+' is now in your portfolio');
+}
+
+/* ---- NOTIFICATIONS ---- */
+function renderNotifications(){
+  const wrap = document.getElementById('notifList');
+  if(!state.notifications.length){
+    wrap.innerHTML = `<div class="empty-state"><div class="es-ico">🔔</div><h4>All caught up</h4><p>You have no notifications right now.</p></div>`;
+    return;
+  }
+  wrap.innerHTML = state.notifications.map(n=>`
+    <div class="notif-item ${n.read?'':'unread'}" onclick="markRead('${n.id}')">
+      <div class="notif-ico" style="background:var(--surface-2);">${n.icon}</div>
+      <div class="notif-mid"><b>${n.title}</b><p>${n.body}</p></div>
+    </div>`).join('');
+}
+function markRead(id){ const n = state.notifications.find(x=>x.id===id); if(n) n.read=true; saveState(); renderNotifications(); updateNotifDot(); }
+function markAllRead(){ state.notifications.forEach(n=>n.read=true); saveState(); renderNotifications(); updateNotifDot(); toast('All notifications marked as read'); }
+function updateNotifDot(){
+  const has = state.notifications.some(n=>!n.read);
+  document.getElementById('notifDot').style.display = has ? 'block' : 'none';
+}
+
+/* ---- PROFILE ---- */
+function openProfileEdit(){
+  document.getElementById('peName').value = state.user.name || '';
+  document.getElementById('peIncome').value = state.user.income || '';
+  document.getElementById('peBudget').value = state.user.budget || '';
+  document.getElementById('peCurrencyLabel').textContent = (state.user.currency||'INR');
+  document.getElementById('peLanguageLabel').textContent = (state.user.language||'English');
+  document.getElementById('peAvatar').textContent = (state.user.name||'A').charAt(0).toUpperCase();
+  showScreen('screen-profile-edit');
+}
+function saveProfileEdit(){
+  const name = document.getElementById('peName').value.trim();
+  const income = parseFloat(document.getElementById('peIncome').value);
+  const budget = parseFloat(document.getElementById('peBudget').value);
+  if(name) state.user.name = name;
+  if(!isNaN(income) && income>0) state.user.income = income;
+  if(!isNaN(budget) && budget>0) state.user.budget = budget;
+  saveState();
+  renderProfile(); renderHome();
+  showScreen('screen-main'); showTab('profile');
+  toast('Profile updated');
+}
+function renderProfile(){
+  const name = state.user.name || 'Avijit Roy';
+  document.getElementById('profileName').textContent = name;
+  document.getElementById('profileAvatar').textContent = name.charAt(0).toUpperCase();
+  document.getElementById('profileSub').textContent = `Free plan · ${fmtINR(state.user.income||0)}/mo income`;
+  const t = document.getElementById('themeToggle');
+  if(t) t.classList.toggle('on', state.user.theme==='dark');
+  const cv = document.getElementById('currencyValue'); if(cv) cv.textContent = (state.user.currency||'INR') + ' ›';
+  const lv = document.getElementById('languageValue'); if(lv) lv.textContent = (state.user.language||'English') + ' ›';
+}
+function toggleRow(el){
+  const toggle = el.classList && el.classList.contains('toggle') ? el : el.querySelector('.toggle');
+  if(toggle) toggle.classList.toggle('on');
+}
+/* ================= CHANGE PIN ================= */
+let pinStage = 'new'; // 'new' -> 'confirm'
+let pinFirstEntry = '';
+let pinCurrentEntry = '';
+function replayOnboarding(){
+  obGoTo(0);
+  showScreen('screen-onboard');
+}
+function openChangePin(){
+  pinStage = 'new'; pinFirstEntry=''; pinCurrentEntry='';
+  document.getElementById('pinScreenTitle').textContent = 'Enter New PIN';
+  document.getElementById('pinSubtext').textContent = 'Choose a 4-digit PIN to lock the app.';
+  document.getElementById('pinError').classList.remove('show');
+  renderPinDots();
+  showScreen('screen-changepin');
+}
+function renderPinDots(){
+  document.querySelectorAll('#pinDots .pin-dot').forEach((d,i)=> d.classList.toggle('filled', i < pinCurrentEntry.length));
+}
+function pinPress(digit){
+  if(pinCurrentEntry.length>=4) return;
+  pinCurrentEntry += digit;
+  renderPinDots();
+  if(pinCurrentEntry.length===4){
+    setTimeout(()=>{
+      if(pinStage==='new'){
+        pinFirstEntry = pinCurrentEntry;
+        pinCurrentEntry = '';
+        pinStage = 'confirm';
+        document.getElementById('pinScreenTitle').textContent = 'Confirm PIN';
+        document.getElementById('pinSubtext').textContent = 'Re-enter your new PIN to confirm.';
+        renderPinDots();
+      } else {
+        if(pinCurrentEntry === pinFirstEntry){
+          state.user.pin = pinCurrentEntry;
+          saveState();
+          showScreen('screen-security');
+          showSuccess('PIN Updated', 'Your app lock PIN has been changed');
+        } else {
+          const dots = document.getElementById('pinDots');
+          dots.classList.remove('shake'); void dots.offsetWidth; dots.classList.add('shake');
+          document.getElementById('pinError').classList.add('show');
+          pinCurrentEntry = '';
+          setTimeout(renderPinDots, 50);
+        }
+      }
+    }, 180);
+  }
+}
+function pinBackspace(){
+  pinCurrentEntry = pinCurrentEntry.slice(0,-1);
+  document.getElementById('pinError').classList.remove('show');
+  renderPinDots();
+}
+
+function exportData(){
+  toast('Preparing export…');
+  setTimeout(()=> showSuccess('Export Ready', 'Your report has been saved as PDF'), 900);
+}
+function confirmDeleteAll(){
+  showConfirm('Delete all data?', 'This will permanently erase every transaction, budget, and goal on this device.', ()=>{
+    localStorage.removeItem('set_state_v1');
+    state = JSON.parse(JSON.stringify(DEFAULT_STATE));
+    state.user.onboarded = true;
+    saveState();
+    refreshAll();
+    closeConfirm();
+    toast('All data deleted');
+  });
+}
+
+/* ================= INSIGHTS ================= */
+let currentPeriod = 'week';
+function setPeriod(p){
+  currentPeriod = p;
+  document.querySelectorAll('#periodToggle button').forEach(b=>b.classList.toggle('active', b.dataset.p===p));
+  renderInsights();
+}
+function generateInsights(){
+  const foodSpend = categorySpend('food');
+  return { food: foodSpend>0 ? `You spent 18% more on food this ${currentPeriod==='week'?'week':'period'} than your usual average.` : 'Add a few expenses to start seeing smart insights.' };
+}
+function renderInsights(){
+  // trend bars
+  const days = currentPeriod==='week' ? 7 : currentPeriod==='month' ? 10 : 12;
+  const labelsWeek = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const trendWrap = document.getElementById('trendBars');
+  const vals = Array.from({length:days}, ()=> Math.round(300+Math.random()*2200));
+  const max = Math.max(...vals);
+  trendWrap.innerHTML = vals.map((v,i)=>`<div class="bar-col"><div class="bar" style="height:${Math.max(6,(v/max)*100)}px; background:${i===days-1?'var(--primary)':'var(--primary-light)'};"></div><div class="bar-lbl">${currentPeriod==='week'?labelsWeek[i]:(i+1)}</div></div>`).join('');
+
+  // donut
+  const cats = CATEGORIES.map(c=>({...c, spend:categorySpend(c.id)})).filter(c=>c.spend>0);
+  const total = cats.reduce((s,c)=>s+c.spend,0) || 1;
+  let acc = 0;
+  const r = 45, cx=55, cy=55, circumference = 2*Math.PI*r;
+  let svg = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--surface-2)" stroke-width="14"/>`;
+  cats.forEach(c=>{
+    const frac = c.spend/total;
+    const dash = frac*circumference;
+    svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${c.color}" stroke-width="14" stroke-dasharray="${dash} ${circumference-dash}" stroke-dashoffset="${-acc*circumference}" transform="rotate(-90 ${cx} ${cy})" stroke-linecap="butt"/>`;
+    acc += frac;
+  });
+  document.getElementById('donutSvg').innerHTML = svg || `<circle cx="55" cy="55" r="45" fill="none" stroke="var(--surface-2)" stroke-width="14"/>`;
+  document.getElementById('donutLegend').innerHTML = cats.length ? cats.sort((a,b)=>b.spend-a.spend).slice(0,5).map(c=>`<div class="dl-row"><div class="dl-dot" style="background:${c.color};"></div>${c.label}<span class="num">${fmtINR(c.spend)}</span></div>`).join('') : `<div style="font-size:12.5px; color:var(--muted); font-weight:600;">No spending yet</div>`;
+
+  // income vs expense
+  const t = computeTotals();
+  const maxIE = Math.max(t.income, t.expense, 1);
+  document.getElementById('ieBars').innerHTML = `
+    <div class="bar-col"><div class="bar" style="height:${(t.income/maxIE)*80}px; background:var(--primary);"></div><div class="bar-lbl">Income</div></div>
+    <div class="bar-col"><div class="bar" style="height:${(t.expense/maxIE)*80}px; background:var(--amber);"></div><div class="bar-lbl">Expense</div></div>`;
+
+  // payment distribution
+  const payMap = {};
+  state.transactions.filter(t=>t.type==='expense').forEach(t=>{ payMap[t.payment] = (payMap[t.payment]||0)+t.amount; });
+  const payTotal = Object.values(payMap).reduce((a,b)=>a+b,0) || 1;
+  const payDist = document.getElementById('payDist');
+  const entries = Object.entries(payMap).sort((a,b)=>b[1]-a[1]);
+  payDist.innerHTML = entries.length ? entries.map(([k,v])=>{
+    const pct = Math.round((v/payTotal)*100);
+    return `<div style="margin-bottom:12px;"><div style="display:flex; justify-content:space-between; font-size:12.5px; font-weight:700; margin-bottom:5px;"><span>${k}</span><span class="num">${pct}%</span></div><div class="progress"><div style="width:${pct}%; background:var(--blue);"></div></div></div>`;
+  }).join('') : `<div style="font-size:12.5px; color:var(--muted); font-weight:600; padding-bottom:10px;">No data yet</div>`;
+
+  document.getElementById('insightSaved').textContent = `You saved ${fmtINR(Math.max(0,t.income-t.expense))} this month`;
+}
+
+/* ================= SHEETS ================= */
+let openSheets = [];
+function openSheet(id){
+  document.getElementById('overlay').classList.add('show');
+  document.getElementById(id).classList.add('show');
+  openSheets.push(id);
+}
+function closeSheet(id){
+  document.getElementById(id).classList.remove('show');
+  openSheets = openSheets.filter(s=>s!==id);
+  if(!openSheets.length) document.getElementById('overlay').classList.remove('show');
+}
+function closeAllSheets(){
+  openSheets.forEach(id=>document.getElementById(id).classList.remove('show'));
+  openSheets = [];
+  document.getElementById('overlay').classList.remove('show');
+}
+document.querySelectorAll('.sheet').forEach(s=> s.addEventListener('click', e=>e.stopPropagation()));
+
+/* ================= PICKERS BUILD ================= */
+let expSelectedCat = 'food', expSelectedPay = 'UPI', incSelectedSource='Salary';
+
+function buildPickers(){
+  document.getElementById('categoryGrid').innerHTML = CATEGORIES.map(c=>`
+    <div class="pick-tile" data-cat="${c.id}" onclick="pickCategory('${c.id}')">
+      <div class="pt-ico" style="background:${c.bg}; color:${c.color};">${c.icon}</div><span>${c.label}</span>
+    </div>`).join('');
+  document.getElementById('paymentGrid').innerHTML = PAYMENTS.map(p=>`
+    <div class="pick-tile" data-pay="${p.id}" onclick="pickPayment('${p.id}')">
+      <div class="pt-ico" style="background:var(--surface-2);">${p.icon}</div><span>${p.id}</span>
+    </div>`).join('');
+  document.getElementById('incomeSourceGrid').innerHTML = INCOME_SOURCES.map(s=>`
+    <div class="pick-tile" data-src="${s.id}" onclick="pickIncomeSource('${s.id}')">
+      <div class="pt-ico" style="background:var(--primary-light); color:var(--primary);">${s.icon}</div><span>${s.id}</span>
+    </div>`).join('');
+  buildFilterChoices();
+  buildCbCategoryGrid('cbCategoryGrid');
+  buildRpCategoryGrid();
+  buildGlIconGrid();
+  buildInvTypeGrid();
+  renderCurrencyList();
+  renderLanguageList();
+  refreshExpPicked(); refreshPayPicked(); refreshIncPicked();
+}
+
+/* ---- CURRENCY & LANGUAGE PICKERS ---- */
+const CURRENCIES = [
+  {code:'INR', symbol:'₹', name:'Indian Rupee', flag:'IN'},
+  {code:'USD', symbol:'$', name:'US Dollar', flag:'US'},
+  {code:'EUR', symbol:'€', name:'Euro', flag:'EU'},
+  {code:'GBP', symbol:'£', name:'British Pound', flag:'GB'},
+  {code:'JPY', symbol:'¥', name:'Japanese Yen', flag:'JP'},
+  {code:'AED', symbol:'د.إ', name:'UAE Dirham', flag:'AE'},
+  {code:'AUD', symbol:'A$', name:'Australian Dollar', flag:'AU'},
+  {code:'CAD', symbol:'C$', name:'Canadian Dollar', flag:'CA'},
+  {code:'SGD', symbol:'S$', name:'Singapore Dollar', flag:'SG'},
+  {code:'CNY', symbol:'¥', name:'Chinese Yuan', flag:'CN'},
+  {code:'CHF', symbol:'Fr', name:'Swiss Franc', flag:'CH'},
+  {code:'HKD', symbol:'HK$', name:'Hong Kong Dollar', flag:'HK'},
+  {code:'NPR', symbol:'₨', name:'Nepalese Rupee', flag:'NP'},
+  {code:'LKR', symbol:'Rs', name:'Sri Lankan Rupee', flag:'LK'},
+  {code:'BDT', symbol:'৳', name:'Bangladeshi Taka', flag:'BD'},
+  {code:'SAR', symbol:'﷼', name:'Saudi Riyal', flag:'SA'},
+  {code:'MYR', symbol:'RM', name:'Malaysian Ringgit', flag:'MY'},
+  {code:'THB', symbol:'฿', name:'Thai Baht', flag:'TH'},
+  {code:'ZAR', symbol:'R', name:'South African Rand', flag:'ZA'},
+  {code:'NZD', symbol:'NZ$', name:'New Zealand Dollar', flag:'NZ'},
+];
+function renderCurrencyList(){
+  const q = (document.getElementById('currencySearch')?.value || '').toLowerCase();
+  const list = CURRENCIES.filter(c => !q || c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q));
+  document.getElementById('currencyList').innerHTML = list.map(c=>`
+    <div class="picker-row ${state.user.currency===c.code?'selected':''}" onclick="pickCurrency('${c.code}')">
+      <div class="pr-flag">${c.symbol}</div>
+      <div class="pr-mid"><b>${c.name}</b><span>${c.code}</span></div>
+      <div class="pr-check">✓</div>
+    </div>`).join('') || `<div style="padding:24px 4px; text-align:center; color:var(--muted); font-size:13px; font-weight:600;">No currencies match "${q}"</div>`;
+}
+function pickCurrency(code){
+  state.user.currency = code;
+  saveState();
+  const c = CURRENCIES.find(x=>x.code===code);
+  const cv = document.getElementById('currencyValue'); if(cv) cv.textContent = code + ' ›';
+  const pe = document.getElementById('peCurrencyLabel'); if(pe) pe.textContent = code;
+  renderCurrencyList();
+  closeSheet('sheet-currency');
+  toast(c.name + ' set as your currency');
+}
+const LANGUAGES = [
+  {id:'English', native:'English', flag:'EN'},
+  {id:'Hindi', native:'हिंदी', flag:'हि'},
+  {id:'Bengali', native:'বাংলা', flag:'বা'},
+  {id:'Tamil', native:'தமிழ்', flag:'த'},
+  {id:'Telugu', native:'తెలుగు', flag:'తె'},
+  {id:'Marathi', native:'मराठी', flag:'म'},
+  {id:'Gujarati', native:'ગુજરાતી', flag:'ગુ'},
+  {id:'Kannada', native:'ಕನ್ನಡ', flag:'ಕ'},
+  {id:'Malayalam', native:'മലയാളം', flag:'മ'},
+  {id:'Punjabi', native:'ਪੰਜਾਬੀ', flag:'ਪੰ'},
+];
+function renderLanguageList(){
+  document.getElementById('languageList').innerHTML = LANGUAGES.map(l=>`
+    <div class="picker-row ${state.user.language===l.id?'selected':''}" onclick="pickLanguage('${l.id}')">
+      <div class="pr-flag">${l.flag}</div>
+      <div class="pr-mid"><b>${l.id}</b><span>${l.native}</span></div>
+      <div class="pr-check">✓</div>
+    </div>`).join('');
+}
+function pickLanguage(id){
+  state.user.language = id;
+  saveState();
+  const lv = document.getElementById('languageValue'); if(lv) lv.textContent = id + ' ›';
+  const pe = document.getElementById('peLanguageLabel'); if(pe) pe.textContent = id;
+  renderLanguageList();
+  closeSheet('sheet-language');
+  toast(id + ' set as your language');
+}
+let invSelectedType = 'sip';
+function buildInvTypeGrid(){
+  const grid = document.getElementById('invTypeGrid');
+  grid.innerHTML = INVEST_TYPES.map(t=>`
+    <div class="pick-tile ${t.id===invSelectedType?'selected':''}" data-inv="${t.id}" onclick="pickInvType('${t.id}')">
+      <div class="pt-ico" style="background:${t.bg}; color:${t.color};">${t.icon}</div><span>${t.label}</span>
+    </div>`).join('');
+  refreshInvPicked();
+}
+function pickInvType(id){ invSelectedType = id; document.querySelectorAll('#invTypeGrid .pick-tile').forEach(t=>t.classList.toggle('selected', t.dataset.inv===id)); refreshInvPicked(); }
+function refreshInvPicked(){
+  const t = investTypeInfo(invSelectedType);
+  document.getElementById('invNameLabel').textContent = t.nameLabel;
+  document.getElementById('invSipField').classList.toggle('hidden', !t.hasSip);
+}
+let expSelectedSubcat = null;
+function pickCategory(id){ expSelectedCat = id; expSelectedSubcat = null; refreshExpPicked(); closeSheet('sheet-category'); }
+function pickPayment(id){ expSelectedPay = id; refreshPayPicked(); closeSheet('sheet-payment'); }
+function pickIncomeSource(id){ incSelectedSource = id; refreshIncPicked(); closeSheet('sheet-income-source'); }
+function refreshExpPicked(){
+  const c = catInfo(expSelectedCat);
+  document.getElementById('expCatIcon').textContent = c.icon;
+  document.getElementById('expCatLabel').textContent = c.label;
+  document.querySelectorAll('#categoryGrid .pick-tile').forEach(t=>t.classList.toggle('selected', t.dataset.cat===expSelectedCat));
+  refreshSubcatLabel();
+}
+function refreshSubcatLabel(){
+  const label = document.getElementById('expSubcatLabel');
+  if(expSelectedSubcat){ label.textContent = expSelectedSubcat; label.style.color = 'var(--ink)'; }
+  else { label.textContent = 'Optional'; label.style.color = 'var(--faint)'; }
+}
+function openSubcategorySheet(){
+  const list = SUBCATEGORIES[expSelectedCat];
+  if(!list || !list.length){ toast('No subcategories for '+catInfo(expSelectedCat).label+' yet'); return; }
+  document.getElementById('subcatSheetTitle').textContent = catInfo(expSelectedCat).label + ' Subcategory';
+  document.getElementById('subcatSearch').value = '';
+  renderSubcategoryList();
+  openSheet('sheet-subcategory');
+}
+function renderSubcategoryList(){
+  const q = (document.getElementById('subcatSearch').value || '').toLowerCase();
+  const all = SUBCATEGORIES[expSelectedCat] || [];
+  const list = all.filter(s => !q || s.toLowerCase().includes(q));
+  let html = `<div class="subcat-row none-row ${!expSelectedSubcat?'selected':''}" onclick="pickSubcategory(null)"><span>None</span><span class="check-ico">✓</span></div>`;
+  html += list.map(s=>`<div class="subcat-row ${expSelectedSubcat===s?'selected':''}" onclick="pickSubcategory('${s.replace(/'/g,"\\'")}')"><span>${s}</span><span class="check-ico">✓</span></div>`).join('');
+  document.getElementById('subcategoryList').innerHTML = html || `<div style="padding:22px 4px; text-align:center; color:var(--muted); font-size:13px; font-weight:600;">No subcategories match "${q}"</div>`;
+}
+function pickSubcategory(name){
+  expSelectedSubcat = name;
+  refreshSubcatLabel();
+  closeSheet('sheet-subcategory');
+}
+function refreshPayPicked(){
+  document.getElementById('expPayLabel').textContent = expSelectedPay;
+  document.querySelectorAll('#paymentGrid .pick-tile').forEach(t=>t.classList.toggle('selected', t.dataset.pay===expSelectedPay));
+}
+function refreshIncPicked(){
+  const s = INCOME_SOURCES.find(x=>x.id===incSelectedSource);
+  document.getElementById('incSourceIcon').textContent = s.icon;
+  document.getElementById('incSourceLabel').textContent = s.id;
+  document.querySelectorAll('#incomeSourceGrid .pick-tile').forEach(t=>t.classList.toggle('selected', t.dataset.src===incSelectedSource));
+}
+
+/* ================= ADD EXPENSE / INCOME FLOW ================= */
+const NOTE_PRESETS = [
+  'Lunch with friends','Family dinner','Online shopping','Monthly subscription','Fuel / petrol',
+  'Grocery run','Rent payment','Electricity bill','Mobile recharge','Internet bill',
+  'Medical / pharmacy','Gift for someone','Weekend outing','Movie night','Cab / auto ride',
+  'Office expense','Coffee break','Snacks','Home essentials','Personal care',
+  'Birthday celebration','Festival shopping','Travel booking','Home repair','Pet care',
+  'Books / stationery','Loan EMI','Insurance premium','Charity / donation','Other'
+];
+let expNoteSelected = null;
+function buildExpNoteChips(){
+  const wrap = document.getElementById('expNoteChips');
+  wrap.innerHTML = NOTE_PRESETS.map(n=>`<div class="chip" data-note="${n}" onclick="pickNotePreset('${n.replace(/'/g,"\\'")}')">${n}</div>`).join('');
+}
+function pickNotePreset(text){
+  const noteBox = document.getElementById('expNote');
+  if(text === 'Other'){
+    expNoteSelected = 'Other';
+    noteBox.classList.remove('hidden');
+    noteBox.value = '';
+    noteBox.focus();
+  } else {
+    expNoteSelected = text;
+    noteBox.classList.add('hidden');
+    noteBox.value = text;
+  }
+  document.querySelectorAll('#expNoteChips .chip').forEach(c=> c.classList.toggle('selected', c.dataset.note===text));
+}
+function openAddExpense(){
+  closeAllSheets();
+  document.getElementById('expAmount').value='';
+  document.getElementById('expMerchant').value='';
+  document.getElementById('expNote').value='';
+  document.getElementById('expNote').classList.add('hidden');
+  document.getElementById('expDate').value = todayISO();
+  expSelectedCat='food'; expSelectedPay='UPI'; expNoteSelected=null; expSelectedSubcat=null;
+  buildExpNoteChips();
+  refreshExpPicked(); refreshPayPicked();
+  openSheet('sheet-add-expense');
+}
+function openAddIncome(){
+  closeAllSheets();
+  document.getElementById('incAmount').value='';
+  document.getElementById('incNote').value='';
+  document.getElementById('incDate').value = todayISO();
+  incSelectedSource='Salary';
+  refreshIncPicked();
+  openSheet('sheet-add-income');
+}
+function saveExpense(){
+  const amt = parseFloat(document.getElementById('expAmount').value);
+  if(!amt || amt<=0){ toast('Enter an amount to continue'); return; }
+  const merchant = document.getElementById('expMerchant').value.trim() || catInfo(expSelectedCat).label;
+  const date = document.getElementById('expDate').value || todayISO();
+  const note = document.getElementById('expNote').value.trim();
+  state.transactions.push({id:'t'+Date.now(), type:'expense', amount:amt, category:expSelectedCat, subcategory:expSelectedSubcat, payment:expSelectedPay, merchant, date, note, time: new Date().toLocaleTimeString('en-IN',{hour:'numeric', minute:'2-digit'})});
+  saveState();
+  closeSheet('sheet-add-expense');
+  refreshAll();
+  showSuccess('Expense Saved', fmtINR(amt)+' added to '+catInfo(expSelectedCat).label);
+  maybeShowInterstitial();
+}
+function saveIncome(){
+  const amt = parseFloat(document.getElementById('incAmount').value);
+  if(!amt || amt<=0){ toast('Enter an amount to continue'); return; }
+  const date = document.getElementById('incDate').value || todayISO();
+  const note = document.getElementById('incNote').value.trim();
+  state.transactions.push({id:'t'+Date.now(), type:'income', amount:amt, category:incSelectedSource, payment:'Bank Transfer', merchant:incSelectedSource+' Credit', date, note, time: new Date().toLocaleTimeString('en-IN',{hour:'numeric', minute:'2-digit'})});
+  saveState();
+  closeSheet('sheet-add-income');
+  refreshAll();
+  showSuccess('Income Saved', fmtINR(amt)+' added from '+incSelectedSource, true);
+  maybeShowInterstitial();
+}
+
+/* ================= SUCCESS OVERLAY ================= */
+function showSuccess(title, sub, positive){
+  document.getElementById('successTitle').textContent = title;
+  document.getElementById('successSub').textContent = sub;
+  const overlay = document.getElementById('successOverlay');
+  overlay.classList.add('show');
+  // restart check draw animation
+  const path = overlay.querySelector('path');
+  path.style.animation = 'none'; void path.offsetWidth; path.style.animation = null;
+  setTimeout(()=> overlay.classList.remove('show'), 1400);
+}
+
+/* ================= TOAST ================= */
+let toastTimer;
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> el.classList.remove('show'), 2200);
+}
+
+/* ================= CONFIRM MODAL ================= */
+function showConfirm(title, body, onConfirm){
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmBody').textContent = body;
+  const btn = document.getElementById('confirmActionBtn');
+  const newBtn = btn.cloneNode(true);
+  btn.parentNode.replaceChild(newBtn, btn);
+  newBtn.addEventListener('click', onConfirm);
+  document.getElementById('confirmModal').classList.add('show');
+}
+function closeConfirm(){ document.getElementById('confirmModal').classList.remove('show'); }
+
+/* ================= PREMIUM ================= */
+function selectPlan(el){
+  document.querySelectorAll('.plan-card').forEach(p=>p.classList.remove('selected'));
+  el.classList.add('selected');
+}
+function startPro(){
+  state.user.isPro = true;
+  state.user.proTrialUntil = null;
+  saveState();
+  applyAdsVisibility();
+  showSuccess('Welcome to Pro ✨', 'All premium features are now unlocked — ads removed');
+  setTimeout(()=> backToMain(), 1300);
+}
+
+/* ================= SCANNER ================= */
+function resetScanner(){
+  document.getElementById('scanStep1').classList.remove('hidden');
+  document.getElementById('scanStep2').classList.add('hidden');
+  document.getElementById('scanStep3').classList.add('hidden');
+  document.getElementById('scanStep4').classList.add('hidden');
+}
+function startScan(){
+  document.getElementById('scanStep1').classList.add('hidden');
+  document.getElementById('scanStep2').classList.remove('hidden');
+  const statusEl = document.getElementById('scanStatusText');
+  const msgs = ['Reading payment details…','Detecting merchant name…','Matching category…'];
+  let i=0; statusEl.textContent = msgs[0];
+  const iv = setInterval(()=>{ i++; if(i<msgs.length) statusEl.textContent = msgs[i]; }, 700);
+  setTimeout(()=>{
+    clearInterval(iv);
+    document.getElementById('scanStep2').classList.add('hidden');
+    document.getElementById('scanStep3').classList.remove('hidden');
+  }, 2300);
+}
+function saveScanExpense(){
+  state.transactions.push({id:'t'+Date.now(), type:'expense', amount:780, category:'groceries', payment:'UPI', merchant:'Blinkit', date:todayISO(), note:'Scanned from screenshot', time:new Date().toLocaleTimeString('en-IN',{hour:'numeric', minute:'2-digit'})});
+  saveState();
+  refreshAll();
+  showScreen('screen-main');
+  resetScanner();
+  showSuccess('Expense Saved', '₹780 added to Groceries');
+}
+
+/* ================= INIT ================= */
+document.getElementById('expDate') && (document.getElementById('expDate').value = todayISO());
+document.getElementById('incDate') && (document.getElementById('incDate').value = todayISO());
+
+function initOpenScreens(){
+  // pre-render lists that live outside tab system
+  renderRecurring(); renderGoals(); renderCards();
+}
+setTimeout(initOpenScreens, 50);
+
+// re-render side screens whenever navigated to
+['screen-recurring','screen-savings','screen-cards','screen-notifications'].forEach(id=>{});
+const _origShowScreen = showScreen;
+showScreen = function(id){
+  _origShowScreen(id);
+  if(id==='screen-recurring') renderRecurring();
+  if(id==='screen-savings') renderGoals();
+  if(id==='screen-cards') renderCards();
+  if(id==='screen-notifications'){ renderNotifications(); }
+  if(id==='screen-budget') renderBudgetScreen();
+  if(id==='screen-insights') renderInsights();
+};
+
+/* ================= FAB ================= */
+function openFabSheet(e){
+  const fab = document.getElementById('fab');
+  fab.classList.remove('fab-pop'); void fab.offsetWidth; fab.classList.add('fab-pop');
+  openSheet('sheet-add-type');
+}
+
+/* ================= DARK THEME ================= */
+function applyTheme(mode){
+  const device = document.getElementById('device');
+  device.setAttribute('data-theme', mode);
+  const t = document.getElementById('themeToggle');
+  if(t) t.classList.toggle('on', mode==='dark');
+}
+function initTheme(){
+  applyTheme(state.user.theme==='dark' ? 'dark' : 'light');
+}
+function toggleTheme(row){
+  const nowDark = state.user.theme === 'dark';
+  state.user.theme = nowDark ? 'light' : 'dark';
+  saveState();
+  applyTheme(state.user.theme);
+  toast(state.user.theme==='dark' ? 'Dark theme on' : 'Dark theme off');
+}
+
+/* ================= ADS (AdMob-style mock: Banner, Interstitial, Rewarded, Native) ================= */
+function adsEnabled(){ return !state.user.isPro; }
+function applyAdsVisibility(){
+  document.getElementById('device').classList.toggle('ads-hidden', !adsEnabled());
+}
+function checkProTrialExpiry(){
+  if(state.user.proTrialUntil && Date.now() > state.user.proTrialUntil){
+    state.user.isPro = false;
+    state.user.proTrialUntil = null;
+    saveState();
+  }
+}
+function nativeAdCardHTML(icon, bg, title, sub){
+  return `<div class="native-ad-card ad-slot">
+    <div class="ad-tag">Ad</div>
+    <div class="native-ad-row">
+      <div class="native-ad-icon" style="background:${bg};">${icon}</div>
+      <div class="native-ad-mid"><b>${title}</b><span>${sub}</span></div>
+    </div>
+    <button class="btn btn-outline btn-sm" style="width:100%;" onclick="toast('Opening advertiser page…')">Learn More</button>
+  </div>`;
+}
+function nativeAdRowHTML(icon, bg, title, sub, ctaLabel){
+  return `<div class="list-card-item ad-slot" style="position:relative;">
+    <div class="ad-tag" style="top:6px; left:6px;">Ad</div>
+    <div class="lci-ico" style="background:${bg};">${icon}</div>
+    <div class="lci-mid"><b>${title}</b><span>${sub}</span></div>
+    <div class="lci-right"><button class="ad-cta" style="padding:7px 13px; font-size:11.5px;" onclick="toast('Opening advertiser page…')">${ctaLabel}</button></div>
+  </div>`;
+}
+
+/* ---- Interstitial ---- */
+const AD_STATE = { actionCount:0 };
+let interstitialTimer = null;
+function maybeShowInterstitial(){
+  if(!adsEnabled()) return;
+  AD_STATE.actionCount++;
+  if(AD_STATE.actionCount % 3 === 0){
+    setTimeout(showInterstitial, 1200);
+  }
+}
+function showInterstitial(){
+  if(!adsEnabled()) return;
+  const overlay = document.getElementById('interstitialOverlay');
+  const closeBtn = document.getElementById('interstitialCloseBtn');
+  const cd = document.getElementById('interstitialCountdown');
+  closeBtn.classList.remove('ready');
+  let secs = 5;
+  cd.textContent = secs;
+  cd.style.display = 'flex';
+  overlay.classList.add('show');
+  clearInterval(interstitialTimer);
+  interstitialTimer = setInterval(()=>{
+    secs--;
+    if(secs<=0){
+      clearInterval(interstitialTimer);
+      cd.style.display = 'none';
+      closeBtn.classList.add('ready');
+    } else {
+      cd.textContent = secs;
+    }
+  }, 1000);
+}
+function closeInterstitial(){
+  const closeBtn = document.getElementById('interstitialCloseBtn');
+  if(!closeBtn.classList.contains('ready')) return;
+  clearInterval(interstitialTimer);
+  document.getElementById('interstitialOverlay').classList.remove('show');
+}
+
+/* ---- Rewarded ---- */
+let rewardedTimer = null;
+function openRewardedAd(){
+  if(!adsEnabled()){ toast("You're already on Pro — enjoy!"); return; }
+  const overlay = document.getElementById('rewardedOverlay');
+  document.getElementById('rewardedBodyPlaying').style.display = 'flex';
+  document.getElementById('rewardedBodyDone').style.display = 'none';
+  const closeBtn = document.getElementById('rewardedCloseBtn');
+  const cd = document.getElementById('rewardedCountdown');
+  const bar = document.getElementById('rewardedProgressBar');
+  closeBtn.classList.remove('ready');
+  bar.style.width = '0%';
+  let secs = 6;
+  cd.textContent = secs;
+  cd.style.display = 'flex';
+  overlay.classList.add('show');
+  clearInterval(rewardedTimer);
+  rewardedTimer = setInterval(()=>{
+    secs--;
+    bar.style.width = (((6-secs)/6)*100)+'%';
+    if(secs<=0){
+      clearInterval(rewardedTimer);
+      cd.style.display = 'none';
+      closeBtn.classList.add('ready');
+      grantRewardedAdBonus();
+    } else {
+      cd.textContent = secs;
+    }
+  }, 1000);
+}
+function grantRewardedAdBonus(){
+  state.user.isPro = true;
+  state.user.proTrialUntil = Date.now() + 24*60*60*1000;
+  saveState();
+  applyAdsVisibility();
+  document.getElementById('rewardedBodyPlaying').style.display = 'none';
+  document.getElementById('rewardedBodyDone').style.display = 'flex';
+}
+function closeRewardedAd(){
+  const closeBtn = document.getElementById('rewardedCloseBtn');
+  const done = document.getElementById('rewardedBodyDone').style.display === 'flex';
+  if(!closeBtn.classList.contains('ready') && !done) return;
+  clearInterval(rewardedTimer);
+  document.getElementById('rewardedOverlay').classList.remove('show');
+}
+
+/* ================= RIPPLE (event-delegated so it works on dynamically rendered elements) ================= */
+const RIPPLE_SELECTOR = '.btn, .icon-btn, .list-card-item, .txn-row, .settings-row, .scan-opt, .cat-card, .quick-tile, #fab, .chip, .pick-tile';
+document.getElementById('device').addEventListener('click', function(e){
+  const target = e.target.closest(RIPPLE_SELECTOR);
+  if(!target) return;
+  const style = getComputedStyle(target);
+  if(style.position === 'static') target.style.position = 'relative';
+  target.style.overflow = target.style.overflow || 'hidden';
+  const rect = target.getBoundingClientRect();
+  const ripple = document.createElement('span');
+  const size = Math.max(rect.width, rect.height) * 1.5;
+  ripple.className = 'ripple-el';
+  ripple.style.width = ripple.style.height = size+'px';
+  ripple.style.left = (e.clientX - rect.left - size/2)+'px';
+  ripple.style.top = (e.clientY - rect.top - size/2)+'px';
+  target.appendChild(ripple);
+  setTimeout(()=> ripple.remove(), 620);
+});
+
+// live clock
+function tickClock(){
+  const d = new Date();
+  document.getElementById('clock').textContent = d.toLocaleTimeString('en-IN',{hour:'numeric', minute:'2-digit', hour12:true}).replace(' ','').replace('am','AM').replace('pm','PM');
+}
+tickClock(); setInterval(tickClock, 30000);
+</script>
+</body>
+</html>
