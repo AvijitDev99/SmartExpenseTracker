@@ -21,7 +21,7 @@ const TILE = scale(75);
 const ORBIT_RADIUS = scale(108);
 const ORBIT_SLOT = scale(10);
 const PROGRESS_MS = 2500;
-const SPLASH_MS = 3500;
+const SPLASH_MS = 4000;
 
 const MINT = "#8DE6B0";
 const MINT_SOFT = "rgba(190, 244, 212, 0.90)";
